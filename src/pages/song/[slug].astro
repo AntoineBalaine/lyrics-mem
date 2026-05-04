@@ -1,0 +1,200 @@
+---
+import { getCollection, type CollectionEntry } from 'astro:content';
+import { applyStep, HTML_STEPS, STEPS } from '../../lib/transformations';
+
+export async function getStaticPaths() {
+  const songs = await getCollection('songs');
+  return songs.map((song) => ({
+    params: { slug: song.id },
+    props: { song },
+  }));
+}
+
+interface Props {
+  song: CollectionEntry<'songs'>;
+}
+
+const { song } = Astro.props as Props;
+const base = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
+const homeUrl = `${base}/`;
+
+const fragments = STEPS.map((step) => ({
+  step,
+  rendered: applyStep(step, song.data.body),
+  isHtml: HTML_STEPS.has(step),
+}));
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width" />
+    <title>{song.data.artist} - {song.data.title}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;900&display=swap"
+    />
+    <script is:inline>
+      // Set the active step on <html> before first paint so the right fragment
+      // shows immediately when arriving via a deep link like ?step=3.
+      (function () {
+        const raw = new URLSearchParams(location.search).get('step');
+        let n = parseInt(raw || '1', 10);
+        if (!Number.isFinite(n)) n = 1;
+        if (n < 1) n = 1;
+        if (n > 4) n = 4;
+        document.documentElement.dataset.activeStep = String(n);
+      })();
+    </script>
+  </head>
+  <body>
+    <p><a href={homeUrl}>← all songs</a></p>
+    <h1>{song.data.artist} — {song.data.title}</h1>
+    <nav>
+      <span>Step <span id="step-num">1</span> / 4</span>
+      <a id="prev-link" href="?step=1">← prev</a>
+      <a id="next-link" href="?step=2">next →</a>
+    </nav>
+    <div id="steps">
+      {
+        fragments.map(({ step, rendered, isHtml }) =>
+          isHtml ? (
+            <pre data-step={step} set:html={rendered} />
+          ) : (
+            <pre data-step={step}>{rendered}</pre>
+          ),
+        )
+      }
+    </div>
+
+    <script>
+      const STEPS_COUNT = 4;
+      const stepNumEl = document.getElementById('step-num') as HTMLElement;
+      const prevLink = document.getElementById('prev-link') as HTMLAnchorElement;
+      const nextLink = document.getElementById('next-link') as HTMLAnchorElement;
+
+      function clamp(n: number): number {
+        if (!Number.isFinite(n)) return 1;
+        return Math.max(1, Math.min(STEPS_COUNT, Math.round(n)));
+      }
+
+      function readStepFromUrl(): number {
+        const raw = new URLSearchParams(location.search).get('step');
+        return clamp(parseInt(raw || '1', 10));
+      }
+
+      function setStep(step: number, push: boolean): void {
+        const target = clamp(step);
+        document.documentElement.dataset.activeStep = String(target);
+        stepNumEl.textContent = String(target);
+        prevLink.hidden = target <= 1;
+        nextLink.hidden = target >= STEPS_COUNT;
+        prevLink.href = `?step=${target - 1}`;
+        nextLink.href = `?step=${target + 1}`;
+        const url = `${location.pathname}?step=${target}`;
+        if (push) history.pushState({ step: target }, '', url);
+        else history.replaceState({ step: target }, '', url);
+      }
+
+      // Initial sync (the inline head script set data-active-step; mirror it into nav state).
+      setStep(readStepFromUrl(), false);
+
+      [prevLink, nextLink].forEach((link) => {
+        link.addEventListener('click', (e) => {
+          e.preventDefault();
+          const target = parseInt(new URL(link.href).searchParams.get('step') ?? '1', 10);
+          setStep(target, true);
+        });
+      });
+
+      window.addEventListener('popstate', () => {
+        setStep(readStepFromUrl(), false);
+      });
+
+      // Touch swipe — swipe left = next step, swipe right = prev step.
+      let startX = 0;
+      let startY = 0;
+      let valid = false;
+      const SWIPE_MIN = 60;
+      const VERT_MAX = 60;
+      document.addEventListener(
+        'touchstart',
+        (e) => {
+          if (e.touches.length !== 1) {
+            valid = false;
+            return;
+          }
+          startX = e.touches[0].clientX;
+          startY = e.touches[0].clientY;
+          valid = true;
+        },
+        { passive: true },
+      );
+      document.addEventListener(
+        'touchend',
+        (e) => {
+          if (!valid) return;
+          const t = e.changedTouches[0];
+          const dx = t.clientX - startX;
+          const dy = t.clientY - startY;
+          if (Math.abs(dx) < SWIPE_MIN || Math.abs(dy) > VERT_MAX) return;
+          const current = readStepFromUrl();
+          if (dx < 0 && current < STEPS_COUNT) setStep(current + 1, true);
+          else if (dx > 0 && current > 1) setStep(current - 1, true);
+        },
+        { passive: true },
+      );
+
+    </script>
+
+    <style is:global>
+      body {
+        max-width: 60ch;
+        margin: 2rem auto;
+        padding: 0 1rem;
+        font-family: system-ui, -apple-system, sans-serif;
+        color: #1a1a1a;
+      }
+      p,
+      a {
+        font-size: 0.9rem;
+      }
+      h1 {
+        font-size: 1.15rem;
+        font-weight: 600;
+        margin: 0.75rem 0 0.25rem;
+      }
+      nav {
+        display: flex;
+        gap: 1rem;
+        align-items: center;
+        font-size: 0.9rem;
+        margin: 0 0 2rem;
+      }
+      nav span {
+        color: #666;
+      }
+      pre[data-step] {
+        display: none;
+        font-size: 1.15rem;
+        line-height: 1.55;
+        font-family: 'Inter', system-ui, -apple-system, sans-serif;
+        white-space: pre-wrap;
+        word-break: break-word;
+        margin: 0;
+        font-weight: 400;
+      }
+      html[data-active-step='1'] pre[data-step='1'],
+      html[data-active-step='2'] pre[data-step='2'],
+      html[data-active-step='3'] pre[data-step='3'],
+      html[data-active-step='4'] pre[data-step='4'] {
+        display: block;
+      }
+      pre b {
+        font-weight: 900;
+      }
+    </style>
+  </body>
+</html>
