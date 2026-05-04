@@ -7,6 +7,8 @@ const songList = songs.map((s) => ({
   artist: s.data.artist,
   title: s.data.title,
 }));
+
+const base = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
 ---
 
 <html lang="en">
@@ -22,7 +24,7 @@ const songList = songs.map((s) => ({
       {
         songList.map((s) => (
           <li data-key={`${s.artist} ${s.title}`}>
-            <a href={`/song/${s.id}/1`}>
+            <a href={`${base}/song/${s.id}/1`}>
               {s.artist} — {s.title}
             </a>
           </li>

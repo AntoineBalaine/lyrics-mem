@@ -22,8 +22,10 @@ const rendered = applyStep(step, song.data.body);
 const isHtml = HTML_STEPS.has(step);
 const prev = step > 1 ? step - 1 : null;
 const next = step < 5 ? step + 1 : null;
-const prevUrl = prev !== null ? `/song/${song.id}/${prev}` : null;
-const nextUrl = next !== null ? `/song/${song.id}/${next}` : null;
+const base = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
+const prevUrl = prev !== null ? `${base}/song/${song.id}/${prev}` : null;
+const nextUrl = next !== null ? `${base}/song/${song.id}/${next}` : null;
+const homeUrl = `${base}/`;
 ---
 
 <html lang="en">
@@ -39,7 +41,7 @@ const nextUrl = next !== null ? `/song/${song.id}/${next}` : null;
     />
   </head>
   <body>
-    <p><a href="/">← all songs</a></p>
+    <p><a href={homeUrl}>← all songs</a></p>
     <h1>{song.data.artist} — {song.data.title}</h1>
     <nav>
       <span>Step {step} / 5</span>
