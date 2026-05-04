@@ -9,12 +9,21 @@ import {
 } from './transformations';
 
 describe('step3FirstLetters', () => {
-  it('returns first letter of each word per line', () => {
-    expect(step3FirstLetters('Hello there world\nFoo bar')).toBe('H t w\nF b');
+  it('keeps each word at its original width with underscores', () => {
+    expect(step3FirstLetters('Hello there world\nFoo bar')).toBe('H____ t____ w____\nF__ b__');
   });
 
   it('preserves blank lines as blank lines', () => {
-    expect(step3FirstLetters('hi\n\nbye')).toBe('h\n\nb');
+    expect(step3FirstLetters('hi\n\nbye')).toBe('h_\n\nb__');
+  });
+
+  it('keeps token length stable', () => {
+    fc.assert(
+      fc.property(
+        fc.stringMatching(/^[A-Za-z ]{1,40}$/),
+        (line) => step3FirstLetters(line).length === line.length,
+      ),
+    );
   });
 });
 

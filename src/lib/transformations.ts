@@ -39,10 +39,12 @@ export function step3FirstLetters(text: string): string {
     .split('\n')
     .map((line) =>
       line
-        .split(/\s+/)
-        .filter(Boolean)
-        .map((w) => w[0] ?? '')
-        .join(' '),
+        .split(/(\s+)/)
+        .map((token) => {
+          if (token.length === 0 || /^\s+$/.test(token)) return token;
+          return token[0] + '_'.repeat(token.length - 1);
+        })
+        .join(''),
     )
     .join('\n');
 }
