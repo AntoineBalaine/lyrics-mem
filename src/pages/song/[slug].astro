@@ -69,11 +69,18 @@ const fragments = STEPS.map((step) => ({
       }
     </div>
 
+    <a id="fab-prev" class="step-fab step-fab-prev" href="?step=1" aria-label="Previous step">‹</a>
+    <a id="fab-next" class="step-fab step-fab-next" href="?step=2" aria-label="Next step">›</a>
+
     <script>
       const STEPS_COUNT = 4;
       const stepNumEl = document.getElementById('step-num') as HTMLElement;
       const prevLink = document.getElementById('prev-link') as HTMLAnchorElement;
       const nextLink = document.getElementById('next-link') as HTMLAnchorElement;
+      const fabPrev = document.getElementById('fab-prev') as HTMLAnchorElement;
+      const fabNext = document.getElementById('fab-next') as HTMLAnchorElement;
+      const prevControls = [prevLink, fabPrev];
+      const nextControls = [nextLink, fabNext];
 
       function clamp(n: number): number {
         if (!Number.isFinite(n)) return 1;
@@ -89,10 +96,16 @@ const fragments = STEPS.map((step) => ({
         const target = clamp(step);
         document.documentElement.dataset.activeStep = String(target);
         stepNumEl.textContent = String(target);
-        prevLink.hidden = target <= 1;
-        nextLink.hidden = target >= STEPS_COUNT;
-        prevLink.href = `?step=${target - 1}`;
-        nextLink.href = `?step=${target + 1}`;
+        const prevHidden = target <= 1;
+        const nextHidden = target >= STEPS_COUNT;
+        for (const el of prevControls) {
+          el.hidden = prevHidden;
+          el.href = `?step=${target - 1}`;
+        }
+        for (const el of nextControls) {
+          el.hidden = nextHidden;
+          el.href = `?step=${target + 1}`;
+        }
         const url = `${location.pathname}?step=${target}`;
         if (push) history.pushState({ step: target }, '', url);
         else history.replaceState({ step: target }, '', url);
@@ -101,7 +114,7 @@ const fragments = STEPS.map((step) => ({
       // Initial sync (the inline head script set data-active-step; mirror it into nav state).
       setStep(readStepFromUrl(), false);
 
-      [prevLink, nextLink].forEach((link) => {
+      [...prevControls, ...nextControls].forEach((link) => {
         link.addEventListener('click', (e) => {
           e.preventDefault();
           const target = parseInt(new URL(link.href).searchParams.get('step') ?? '1', 10);
@@ -113,12 +126,18 @@ const fragments = STEPS.map((step) => ({
         setStep(readStepFromUrl(), false);
       });
 
-      // Touch swipe — swipe left = next step, swipe right = prev step.
+      // Touch swipe with direction locking — once the gesture is identified
+      // as horizontal, vertical scroll is suppressed for the rest of the
+      // gesture (preventDefault on touchmove). If it's identified as vertical
+      // first, scroll proceeds normally and no swipe nav fires.
       let startX = 0;
       let startY = 0;
       let valid = false;
+      let lockedHorizontal = false;
+      let lockedVertical = false;
+      const LOCK_THRESHOLD = 10;
       const SWIPE_MIN = 60;
-      const VERT_MAX = 60;
+
       document.addEventListener(
         'touchstart',
         (e) => {
@@ -129,17 +148,39 @@ const fragments = STEPS.map((step) => ({
           startX = e.touches[0].clientX;
           startY = e.touches[0].clientY;
           valid = true;
+          lockedHorizontal = false;
+          lockedVertical = false;
         },
         { passive: true },
       );
+
+      document.addEventListener(
+        'touchmove',
+        (e) => {
+          if (!valid) return;
+          const t = e.touches[0];
+          const dx = t.clientX - startX;
+          const dy = t.clientY - startY;
+          if (!lockedHorizontal && !lockedVertical) {
+            const absX = Math.abs(dx);
+            const absY = Math.abs(dy);
+            if (absX > LOCK_THRESHOLD || absY > LOCK_THRESHOLD) {
+              if (absX > absY) lockedHorizontal = true;
+              else lockedVertical = true;
+            }
+          }
+          if (lockedHorizontal) e.preventDefault();
+        },
+        { passive: false },
+      );
+
       document.addEventListener(
         'touchend',
         (e) => {
-          if (!valid) return;
+          if (!valid || !lockedHorizontal) return;
           const t = e.changedTouches[0];
           const dx = t.clientX - startX;
-          const dy = t.clientY - startY;
-          if (Math.abs(dx) < SWIPE_MIN || Math.abs(dy) > VERT_MAX) return;
+          if (Math.abs(dx) < SWIPE_MIN) return;
           const current = readStepFromUrl();
           if (dx < 0 && current < STEPS_COUNT) setStep(current + 1, true);
           else if (dx > 0 && current > 1) setStep(current - 1, true);
@@ -194,6 +235,40 @@ const fragments = STEPS.map((step) => ({
       }
       pre b {
         font-weight: 900;
+      }
+      .step-fab {
+        position: fixed;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 2.75rem;
+        height: 2.75rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(0, 0, 0, 0.12);
+        color: rgba(0, 0, 0, 0.65);
+        border-radius: 999px;
+        font-size: 1.75rem;
+        line-height: 1;
+        text-decoration: none;
+        user-select: none;
+        z-index: 10;
+        transition:
+          background 0.15s,
+          color 0.15s;
+      }
+      .step-fab:hover {
+        background: rgba(0, 0, 0, 0.28);
+        color: rgba(0, 0, 0, 0.9);
+      }
+      .step-fab-prev {
+        left: 0.75rem;
+      }
+      .step-fab-next {
+        right: 0.75rem;
+      }
+      .step-fab[hidden] {
+        display: none;
       }
     </style>
   </body>
