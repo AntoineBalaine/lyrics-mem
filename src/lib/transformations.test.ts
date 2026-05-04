@@ -2,38 +2,31 @@ import { describe, it, expect } from 'vitest';
 import fc from 'fast-check';
 import {
   applyStep,
-  step1Full,
-  step3BionicStripped,
-  step4FirstLetters,
-  step5FirstLineLetters,
+  step2BionicStripped,
+  step3FirstLetters,
+  step4FirstLineLetters,
   STEPS,
 } from './transformations';
 
-describe('step1Full', () => {
-  it('returns text unchanged', () => {
-    expect(step1Full('hello\nworld')).toBe('hello\nworld');
-  });
-});
-
-describe('step4FirstLetters', () => {
+describe('step3FirstLetters', () => {
   it('returns first letter of each word per line', () => {
-    expect(step4FirstLetters('Hello there world\nFoo bar')).toBe('H t w\nF b');
+    expect(step3FirstLetters('Hello there world\nFoo bar')).toBe('H t w\nF b');
   });
 
   it('preserves blank lines as blank lines', () => {
-    expect(step4FirstLetters('hi\n\nbye')).toBe('h\n\nb');
+    expect(step3FirstLetters('hi\n\nbye')).toBe('h\n\nb');
   });
 });
 
-describe('step5FirstLineLetters', () => {
+describe('step4FirstLineLetters', () => {
   it('returns first letter of each line', () => {
-    expect(step5FirstLineLetters('Hello there\nWorld how\nAre you')).toBe('H\nW\nA');
+    expect(step4FirstLineLetters('Hello there\nWorld how\nAre you')).toBe('H\nW\nA');
   });
 });
 
-describe('step3BionicStripped', () => {
+describe('step2BionicStripped', () => {
   it('preserves whitespace and line breaks', () => {
-    const out = step3BionicStripped('Hello world\nFoo bar');
+    const out = step2BionicStripped('Hello world\nFoo bar');
     expect(out.split('\n')).toHaveLength(2);
   });
 
@@ -41,7 +34,7 @@ describe('step3BionicStripped', () => {
     fc.assert(
       fc.property(
         fc.stringMatching(/^[A-Za-z ]{1,40}$/),
-        (line) => step3BionicStripped(line).length === line.length,
+        (line) => step2BionicStripped(line).length === line.length,
       ),
     );
   });

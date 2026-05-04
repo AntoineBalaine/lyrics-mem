@@ -1,10 +1,10 @@
 import { textVide } from 'text-vide';
 
-export type Step = 1 | 2 | 3 | 4 | 5;
+export type Step = 1 | 2 | 3 | 4;
 
-export const STEPS: readonly Step[] = [1, 2, 3, 4, 5] as const;
+export const STEPS: readonly Step[] = [1, 2, 3, 4] as const;
 
-export const HTML_STEPS: ReadonlySet<Step> = new Set([2]);
+export const HTML_STEPS: ReadonlySet<Step> = new Set([1]);
 
 function escapeHtml(s: string): string {
   return s
@@ -14,15 +14,11 @@ function escapeHtml(s: string): string {
     .replace(/"/g, '&quot;');
 }
 
-export function step1Full(text: string): string {
-  return text;
-}
-
-export function step2Bionic(text: string): string {
+export function step1Bionic(text: string): string {
   return textVide(escapeHtml(text));
 }
 
-export function step3BionicStripped(text: string): string {
+export function step2BionicStripped(text: string): string {
   return text
     .split('\n')
     .map((line) =>
@@ -38,7 +34,7 @@ export function step3BionicStripped(text: string): string {
     .join('\n');
 }
 
-export function step4FirstLetters(text: string): string {
+export function step3FirstLetters(text: string): string {
   return text
     .split('\n')
     .map((line) =>
@@ -51,7 +47,7 @@ export function step4FirstLetters(text: string): string {
     .join('\n');
 }
 
-export function step5FirstLineLetters(text: string): string {
+export function step4FirstLineLetters(text: string): string {
   return text
     .split('\n')
     .map((line) => line.trim()[0] ?? '')
@@ -61,15 +57,13 @@ export function step5FirstLineLetters(text: string): string {
 export function applyStep(step: Step, text: string): string {
   switch (step) {
     case 1:
-      return step1Full(text);
+      return step1Bionic(text);
     case 2:
-      return step2Bionic(text);
+      return step2BionicStripped(text);
     case 3:
-      return step3BionicStripped(text);
+      return step3FirstLetters(text);
     case 4:
-      return step4FirstLetters(text);
-    case 5:
-      return step5FirstLineLetters(text);
+      return step4FirstLineLetters(text);
   }
 }
 

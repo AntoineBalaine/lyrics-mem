@@ -21,7 +21,7 @@ const { song, step } = Astro.props as Props;
 const rendered = applyStep(step, song.data.body);
 const isHtml = HTML_STEPS.has(step);
 const prev = step > 1 ? step - 1 : null;
-const next = step < 5 ? step + 1 : null;
+const next = step < 4 ? step + 1 : null;
 const base = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
 const prevUrl = prev !== null ? `${base}/song/${song.id}/${prev}` : null;
 const nextUrl = next !== null ? `${base}/song/${song.id}/${next}` : null;
@@ -44,7 +44,7 @@ const homeUrl = `${base}/`;
     <p><a href={homeUrl}>← all songs</a></p>
     <h1>{song.data.artist} — {song.data.title}</h1>
     <nav>
-      <span>Step {step} / 5</span>
+      <span>Step {step} / 4</span>
       {prevUrl && <a href={prevUrl}>← prev</a>}
       {nextUrl && <a href={nextUrl}>next →</a>}
     </nav>
