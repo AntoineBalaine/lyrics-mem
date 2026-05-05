@@ -3,7 +3,7 @@
 	admin off
 }
 
-127.0.0.1:{$LYRICS_PORT:8081} {
+http://127.0.0.1:{$LYRICS_PORT:8081} {
 	basicauth {
 		antoine {env.LYRICS_PASS_HASH}
 	}
