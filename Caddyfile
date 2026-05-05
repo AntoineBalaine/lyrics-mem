@@ -4,7 +4,7 @@
 }
 
 127.0.0.1:{$LYRICS_PORT:8081} {
-	basic_auth {
+	basicauth {
 		antoine {env.LYRICS_PASS_HASH}
 	}
 
