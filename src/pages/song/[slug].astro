@@ -3,6 +3,7 @@ import { getCollection, type CollectionEntry } from 'astro:content';
 import { applyStep, HTML_STEPS, STEPS } from '../../lib/transformations';
 
 export async function getStaticPaths() {
+  if (process.env.LYRICS_MODE === 'public') return [];
   const songs = await getCollection('songs');
   return songs.map((song) => ({
     params: { slug: song.id },
@@ -34,7 +35,7 @@ const fragments = STEPS.map((step) => ({
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;900&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Source+Code+Pro:wght@400;900&display=swap"
     />
     <script is:inline>
       // Set the active step on <html> before first paint so the right fragment
@@ -221,7 +222,7 @@ const fragments = STEPS.map((step) => ({
         display: none;
         font-size: 1.15rem;
         line-height: 1.55;
-        font-family: 'Inter', system-ui, -apple-system, sans-serif;
+        font-family: 'Source Code Pro', ui-monospace, Menlo, Consolas, monospace;
         white-space: pre-wrap;
         word-break: break-word;
         margin: 0;

@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "astro dev",
+    "dev:public": "LYRICS_MODE=public astro dev",
     "build": "astro build",
+    "build:public": "LYRICS_MODE=public astro build",
     "preview": "astro preview",
     "check": "astro check",
     "test": "vitest run",
@@ -16,14 +18,17 @@
   },
   "dependencies": {
     "astro": "^5.0.0",
+    "idb": "^8.0.3",
     "minisearch": "^7.0.0",
-    "text-vide": "^1.5.0"
+    "text-vide": "^1.5.0",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.9",
     "@types/node": "^20.11.0",
     "eslint": "^9.0.0",
     "eslint-plugin-astro": "^1.2.0",
+    "fake-indexeddb": "^6.2.5",
     "fast-check": "^3.18.0",
     "prettier": "^3.2.0",
     "prettier-plugin-astro": "^0.13.0",

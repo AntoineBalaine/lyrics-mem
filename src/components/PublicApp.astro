@@ -1,0 +1,332 @@
+---
+// Public-mode SPA shell. All actual content rendered client-side from IDB.
+---
+
+<header>
+  <h1>lyrics-mem</h1>
+  <p class="tagline">A bionic-reading lyrics memorizer. Songs live in your browser only.</p>
+</header>
+
+<section id="view-library">
+  <div class="toolbar">
+    <input
+      id="library-filter"
+      type="search"
+      placeholder="Filter your library…"
+      autocomplete="off"
+    />
+    <button id="btn-add-search" class="primary">+ Add song</button>
+  </div>
+  <p id="library-empty" class="empty" hidden>
+    Your library is empty. Click <strong>+ Add song</strong> to get started.
+  </p>
+  <ul id="library-list" class="library-list"></ul>
+  <footer class="lib-footer">
+    <span id="library-count"></span>
+    <span class="lib-actions">
+      <button id="btn-add-manual" class="link">Add manually</button>
+      <button id="btn-export" class="link">Export</button>
+      <button id="btn-import" class="link">Import</button>
+    </span>
+  </footer>
+</section>
+
+<section id="view-song" hidden>
+  <div class="song-toolbar">
+    <button id="btn-song-back" class="link">← Library</button>
+    <button id="btn-song-edit" class="link">Edit</button>
+  </div>
+  <h2 id="song-title"></h2>
+  <nav class="step-nav">
+    <span>Step <span id="song-step-num">1</span> / 4</span>
+  </nav>
+  <div id="song-steps"></div>
+  <a
+    id="song-fab-prev"
+    class="step-fab step-fab-prev"
+    href="#"
+    aria-label="Previous step"
+    hidden>‹</a
+  >
+  <a id="song-fab-next" class="step-fab step-fab-next" href="#" aria-label="Next step">›</a>
+</section>
+
+<section id="view-add" hidden>
+  <div class="form-toolbar">
+    <button id="btn-add-back" class="link">← Library</button>
+  </div>
+  <h2>Search for a song</h2>
+  <p class="hint">Lyrics are fetched from LRCLIB and saved only to your browser.</p>
+  <div class="add-search">
+    <input id="add-query" type="search" placeholder="Artist, title, or both…" autocomplete="off" />
+    <button id="btn-add-go" class="primary">Search</button>
+  </div>
+  <p id="add-status" class="status"></p>
+  <ul id="add-results" class="results"></ul>
+  <p class="hint">
+    Can't find it? <button id="btn-add-manual-from-search" class="link">Add manually</button>
+  </p>
+</section>
+
+<section id="view-manual" hidden>
+  <div class="form-toolbar">
+    <button id="btn-manual-cancel" class="link">← Library</button>
+  </div>
+  <h2>Add manually</h2>
+  <label>Artist <input id="manual-artist" type="text" /></label>
+  <label>Title <input id="manual-title" type="text" /></label>
+  <label>
+    Lyrics
+    <textarea id="manual-body" rows="14" placeholder="Paste lyrics, one line per line…"></textarea>
+  </label>
+  <p id="manual-status" class="status"></p>
+  <button id="btn-manual-save" class="primary">Save</button>
+</section>
+
+<section id="view-edit" hidden>
+  <div class="form-toolbar">
+    <button id="btn-edit-cancel" class="link">← Cancel</button>
+    <button id="btn-edit-delete" class="link danger">Delete</button>
+  </div>
+  <h2>Edit song</h2>
+  <label>Artist <input id="edit-artist" type="text" /></label>
+  <label>Title <input id="edit-title" type="text" /></label>
+  <label>
+    Lyrics <textarea id="edit-body" rows="14"></textarea>
+  </label>
+  <p id="edit-status" class="status"></p>
+  <button id="btn-edit-save" class="primary">Save</button>
+</section>
+
+<style is:global>
+  body {
+    max-width: 60ch;
+    margin: 2rem auto;
+    padding: 0 1rem 5rem;
+    font-family: system-ui, -apple-system, sans-serif;
+    color: #1a1a1a;
+  }
+  header {
+    margin-bottom: 1.5rem;
+  }
+  h1 {
+    font-size: 1.4rem;
+    font-weight: 600;
+    margin: 0;
+  }
+  h2 {
+    font-size: 1.15rem;
+    font-weight: 600;
+    margin: 0.75rem 0 1rem;
+  }
+  .tagline {
+    font-size: 0.85rem;
+    color: #666;
+    margin: 0.25rem 0 0;
+  }
+  .toolbar,
+  .add-search {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+  }
+  .form-toolbar {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+  }
+  .song-toolbar {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.75rem;
+    font-size: 0.9rem;
+  }
+  input[type='search'],
+  input[type='text'],
+  textarea {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    font-size: 1rem;
+    box-sizing: border-box;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-family: inherit;
+  }
+  textarea {
+    font-family: 'Source Code Pro', ui-monospace, Menlo, Consolas, monospace;
+    font-size: 0.95rem;
+  }
+  label {
+    display: block;
+    margin: 0.75rem 0;
+    font-size: 0.85rem;
+    color: #555;
+  }
+  label input,
+  label textarea {
+    display: block;
+    margin-top: 0.25rem;
+    color: #1a1a1a;
+    font-size: 1rem;
+  }
+  button {
+    font-size: 0.9rem;
+    font-family: inherit;
+    cursor: pointer;
+  }
+  button.primary {
+    padding: 0.5rem 1rem;
+    background: #1a1a1a;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    white-space: nowrap;
+  }
+  button.primary:hover {
+    background: #333;
+  }
+  button.link {
+    background: none;
+    border: none;
+    color: #0066cc;
+    padding: 0;
+    text-decoration: underline;
+  }
+  button.link.danger {
+    color: #cc0000;
+  }
+  .empty {
+    color: #666;
+    font-style: italic;
+    text-align: center;
+    padding: 2rem 0;
+  }
+  .library-list,
+  .results {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+  .library-list li {
+    border-bottom: 1px solid #eee;
+  }
+  .library-list a.library-item,
+  .results button.add-pick {
+    display: flex;
+    flex-direction: column;
+    padding: 0.6rem 0;
+    text-decoration: none;
+    color: inherit;
+    background: none;
+    border: none;
+    text-align: left;
+    width: 100%;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 1rem;
+  }
+  .library-list a.library-item:hover,
+  .results button.add-pick:hover {
+    background: #f5f5f5;
+  }
+  .lib-title {
+    font-weight: 600;
+  }
+  .lib-artist {
+    font-size: 0.85rem;
+    color: #666;
+  }
+  .results li {
+    border-bottom: 1px solid #eee;
+    padding: 0.25rem 0;
+  }
+  .lib-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid #eee;
+    font-size: 0.85rem;
+    color: #666;
+  }
+  .lib-actions {
+    display: flex;
+    gap: 1rem;
+  }
+  .status {
+    font-size: 0.85rem;
+    color: #666;
+    margin: 0.5rem 0;
+  }
+  .hint {
+    font-size: 0.85rem;
+    color: #666;
+    margin: 0.5rem 0;
+  }
+
+  .step-nav {
+    font-size: 0.9rem;
+    color: #666;
+    margin: 0 0 1.5rem;
+  }
+  #song-steps pre {
+    display: none;
+    font-size: 1.15rem;
+    line-height: 1.55;
+    font-family: 'Source Code Pro', ui-monospace, Menlo, Consolas, monospace;
+    white-space: pre-wrap;
+    word-break: break-word;
+    margin: 0;
+    font-weight: 400;
+  }
+  html[data-active-step='1'] #song-steps pre[data-step='1'],
+  html[data-active-step='2'] #song-steps pre[data-step='2'],
+  html[data-active-step='3'] #song-steps pre[data-step='3'],
+  html[data-active-step='4'] #song-steps pre[data-step='4'] {
+    display: block;
+  }
+  #song-steps pre b {
+    font-weight: 900;
+  }
+
+  .step-fab {
+    position: fixed;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 2.75rem;
+    height: 2.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.12);
+    color: rgba(0, 0, 0, 0.65);
+    border-radius: 999px;
+    font-size: 1.75rem;
+    line-height: 1;
+    text-decoration: none;
+    user-select: none;
+    z-index: 10;
+    transition:
+      background 0.15s,
+      color 0.15s;
+  }
+  .step-fab:hover {
+    background: rgba(0, 0, 0, 0.28);
+    color: rgba(0, 0, 0, 0.9);
+  }
+  .step-fab-prev {
+    left: 0.75rem;
+  }
+  .step-fab-next {
+    right: 0.75rem;
+  }
+  .step-fab[hidden] {
+    display: none;
+  }
+</style>
+
+<script>
+  import { boot } from '../lib/public-app';
+  void boot();
+</script>

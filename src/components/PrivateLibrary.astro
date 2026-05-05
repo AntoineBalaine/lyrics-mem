@@ -1,0 +1,78 @@
+---
+interface Props {
+  songs: Array<{ id: string; artist: string; title: string }>;
+  base: string;
+}
+const { songs, base } = Astro.props as Props;
+---
+
+<h1>Songs</h1>
+<input id="q" type="search" placeholder="Search (fuzzy)…" autocomplete="off" />
+<ul id="list">
+  {
+    songs.map((s) => (
+      <li data-key={`${s.artist} ${s.title}`}>
+        <a href={`${base}/song/${s.id}`}>
+          {s.artist} — {s.title}
+        </a>
+      </li>
+    ))
+  }
+</ul>
+
+<style>
+  h1 {
+    font-size: 1.4rem;
+    font-weight: 600;
+    margin: 0 0 1rem;
+  }
+  #q {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    font-size: 1rem;
+    box-sizing: border-box;
+    margin-bottom: 1rem;
+  }
+  #list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    font-size: 1.15rem;
+  }
+  #list li {
+    padding: 0.4rem 0;
+  }
+  #list a {
+    text-decoration: none;
+    color: inherit;
+  }
+  #list a:hover {
+    text-decoration: underline;
+  }
+</style>
+
+<script>
+  import MiniSearch from 'minisearch';
+
+  const items = Array.from(document.querySelectorAll<HTMLLIElement>('#list li')).map(
+    (el, i) => ({ i, text: el.dataset.key ?? '', el }),
+  );
+
+  const ms = new MiniSearch({
+    fields: ['text'],
+    storeFields: ['i'],
+    searchOptions: { fuzzy: 0.2, prefix: true },
+  });
+  ms.addAll(items.map(({ i, text }) => ({ id: i, text })));
+
+  const q = document.getElementById('q') as HTMLInputElement | null;
+  q?.addEventListener('input', () => {
+    const term = q.value.trim();
+    if (!term) {
+      for (const it of items) it.el.hidden = false;
+      return;
+    }
+    const hits = new Set(ms.search(term).map((r) => r.id as number));
+    for (const it of items) it.el.hidden = !hits.has(it.i);
+  });
+</script>

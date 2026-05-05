@@ -1,12 +1,17 @@
 ---
 import { getCollection } from 'astro:content';
+import PrivateLibrary from '../components/PrivateLibrary.astro';
+import PublicApp from '../components/PublicApp.astro';
 
-const songs = await getCollection('songs');
-const songList = songs.map((s) => ({
-  id: s.id,
-  artist: s.data.artist,
-  title: s.data.title,
-}));
+const isPublic = process.env.LYRICS_MODE === 'public';
+
+const songs = isPublic
+  ? []
+  : (await getCollection('songs')).map((s) => ({
+      id: s.id,
+      artist: s.data.artist,
+      title: s.data.title,
+    }));
 
 const base = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
 ---
@@ -16,84 +21,14 @@ const base = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width" />
     <title>lyrics-mem</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Source+Code+Pro:wght@400;900&display=swap"
+    />
   </head>
   <body>
-    <h1>Songs</h1>
-    <input id="q" type="search" placeholder="Search (fuzzy)…" autocomplete="off" />
-    <ul id="list">
-      {
-        songList.map((s) => (
-          <li data-key={`${s.artist} ${s.title}`}>
-            <a href={`${base}/song/${s.id}`}>
-              {s.artist} — {s.title}
-            </a>
-          </li>
-        ))
-      }
-    </ul>
-
-    <style>
-      body {
-        max-width: 60ch;
-        margin: 2rem auto;
-        padding: 0 1rem;
-        font-family: system-ui, -apple-system, sans-serif;
-        color: #1a1a1a;
-      }
-      h1 {
-        font-size: 1.4rem;
-        font-weight: 600;
-        margin: 0 0 1rem;
-      }
-      #q {
-        width: 100%;
-        padding: 0.5rem 0.75rem;
-        font-size: 1rem;
-        box-sizing: border-box;
-        margin-bottom: 1rem;
-      }
-      #list {
-        list-style: none;
-        padding: 0;
-        margin: 0;
-        font-size: 1.15rem;
-      }
-      #list li {
-        padding: 0.4rem 0;
-      }
-      #list a {
-        text-decoration: none;
-        color: inherit;
-      }
-      #list a:hover {
-        text-decoration: underline;
-      }
-    </style>
-
-    <script>
-      import MiniSearch from 'minisearch';
-
-      const items = Array.from(document.querySelectorAll<HTMLLIElement>('#list li')).map(
-        (el, i) => ({ i, text: el.dataset.key ?? '', el }),
-      );
-
-      const ms = new MiniSearch({
-        fields: ['text'],
-        storeFields: ['i'],
-        searchOptions: { fuzzy: 0.2, prefix: true },
-      });
-      ms.addAll(items.map(({ i, text }) => ({ id: i, text })));
-
-      const q = document.getElementById('q') as HTMLInputElement | null;
-      q?.addEventListener('input', () => {
-        const term = q.value.trim();
-        if (!term) {
-          for (const it of items) it.el.hidden = false;
-          return;
-        }
-        const hits = new Set(ms.search(term).map((r) => r.id as number));
-        for (const it of items) it.el.hidden = !hits.has(it.i);
-      });
-    </script>
+    {isPublic ? <PublicApp /> : <PrivateLibrary songs={songs} base={base} />}
   </body>
 </html>
