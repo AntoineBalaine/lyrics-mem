@@ -1,0 +1,14 @@
+{
+	auto_https off
+	admin off
+}
+
+127.0.0.1:{$LYRICS_PORT:8081} {
+	basic_auth {
+		antoine {env.LYRICS_PASS_HASH}
+	}
+
+	root * {$LYRICS_DIR}
+	encode gzip zstd
+	file_server
+}
