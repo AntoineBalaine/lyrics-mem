@@ -5,6 +5,6 @@ export default [
   ...tseslint.configs.recommended,
   ...astro.configs['flat/recommended'],
   {
-    ignores: ['dist/', '.astro/', 'node_modules/'],
+    ignores: ['dist/', 'dist-public/', '.astro/', 'node_modules/'],
   },
 ];

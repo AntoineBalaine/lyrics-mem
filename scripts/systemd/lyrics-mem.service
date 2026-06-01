@@ -1,0 +1,29 @@
+[Unit]
+Description=lyrics-mem static site (containerized via docker compose)
+Documentation=https://lyrics.perken.tv https://public-lyrics.perken.tv
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/tank/projects/lyrics-mem
+
+# Bring the stack up at boot, take it down on shutdown.
+# Per-container restart-on-crash is handled by Docker's `restart: unless-stopped`
+# in compose.yaml — systemd only owns "is the stack up at all".
+ExecStart=/usr/bin/docker compose up -d --remove-orphans
+ExecStop=/usr/bin/docker compose down
+
+# If `docker compose up -d` fails (e.g. transient docker daemon hiccup at boot),
+# retry until it succeeds. Without this the unit just enters failed state.
+Restart=on-failure
+RestartSec=5
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=lyrics-mem
+
+[Install]
+WantedBy=multi-user.target

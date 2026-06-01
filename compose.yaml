@@ -1,0 +1,71 @@
+# lyrics-mem static site, containerized.
+# Two services, one per build. Each runs python -m http.server inside a
+# minimal python:3-slim image. The dist directory is bind-mounted read-only.
+#
+# Networking: each container binds 0.0.0.0 inside, but Docker only publishes
+# on the host's 127.0.0.1 — so external traffic can't reach the containers
+# directly. Only cloudflared on the host (which forwards from
+# {public-,}lyrics.perken.tv -> 127.0.0.1:808{1,2}) can reach them.
+#
+# restart: unless-stopped means Docker keeps each container alive across
+# crashes. The wrapping systemd unit (scripts/systemd/lyrics-mem.service)
+# brings the whole stack up at boot and tears it down on shutdown.
+
+services:
+  private:
+    image: python:3-slim
+    container_name: lyrics-mem-private
+    restart: unless-stopped
+    init: true
+    read_only: true
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    ports:
+      - "127.0.0.1:8081:8081"
+    volumes:
+      - ./dist:/srv/dist:ro
+    working_dir: /srv
+    command:
+      - python3
+      - -m
+      - http.server
+      - "8081"
+      - --bind
+      - 0.0.0.0
+      - --directory
+      - dist
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8081/', timeout=2).status==200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+  public:
+    image: python:3-slim
+    container_name: lyrics-mem-public
+    restart: unless-stopped
+    init: true
+    read_only: true
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    ports:
+      - "127.0.0.1:8082:8082"
+    volumes:
+      - ./dist-public:/srv/dist-public:ro
+    working_dir: /srv
+    command:
+      - python3
+      - -m
+      - http.server
+      - "8082"
+      - --bind
+      - 0.0.0.0
+      - --directory
+      - dist-public
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8082/', timeout=2).status==200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
