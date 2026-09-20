@@ -1,0 +1,254 @@
+---
+// Chord chart memorizer (proof of concept). Fully client-side: chord
+// charts live only in the browser's IndexedDB (see src/lib/chords-db.ts),
+// mirroring the lyrics app's public-mode pattern — no server-side DB.
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width" />
+    <title>chords-mem</title>
+    <script is:inline src="https://cdn.jsdelivr.net/npm/abcjs@6.5.2/dist/abcjs-basic-min.js"></script>
+  </head>
+  <body>
+    <header>
+      <h1>chords-mem</h1>
+      <p class="tagline">
+        A progressive-cloze chord chart memorizer. Paste an iRealPro chart link — charts live in
+        your browser only.
+      </p>
+    </header>
+
+    <section id="view-library">
+      <div class="toolbar">
+        <input
+          id="import-url"
+          type="text"
+          placeholder="Paste an irealb:// link…"
+          autocomplete="off"
+        />
+        <button id="btn-import" class="primary">Import</button>
+      </div>
+      <p class="hint">
+        No link handy? Try a demo chart:
+        <button type="button" class="link" data-demo-index="0">Autumn Leaves</button>,
+        <button type="button" class="link" data-demo-index="1">Black Orpheus</button>, or
+        <button type="button" class="link" data-demo-index="2">All of Me</button>
+      </p>
+      <p id="import-status" class="status"></p>
+
+      <p id="library-empty" class="empty" hidden>
+        No chord charts yet. Paste an iRealPro link above to get started.
+      </p>
+      <ul id="library-list" class="library-list"></ul>
+      <footer class="lib-footer">
+        <span id="library-count"></span>
+      </footer>
+    </section>
+
+    <section id="view-chart" hidden>
+      <div class="chart-toolbar">
+        <button id="btn-chart-back" class="link">← Charts</button>
+      </div>
+      <h2 id="chart-title"></h2>
+      <nav class="level-nav">
+        <button id="btn-level-prev">← level</button>
+        <span>Level <span id="chart-level-num">1</span> / 4</span>
+        <button id="btn-level-next">level →</button>
+      </nav>
+      <div id="chart-score"></div>
+
+      <details class="debug-output">
+        <summary>ABC text (current level, fed to abcjs)</summary>
+        <pre id="debug-abc-output"></pre>
+      </details>
+      <details class="debug-output">
+        <summary>ABCx text (converted from the iRealPro link at import time)</summary>
+        <pre id="debug-abcx-output"></pre>
+      </details>
+    </section>
+
+    <script>
+      import { boot } from '../../lib/chords-app';
+      void boot();
+    </script>
+
+    <style is:global>
+      body {
+        max-width: 70ch;
+        margin: 2rem auto;
+        padding: 0 1rem 5rem;
+        font-family:
+          system-ui,
+          -apple-system,
+          sans-serif;
+        color: #1a1a1a;
+      }
+      header {
+        margin-bottom: 1.5rem;
+      }
+      h1 {
+        font-size: 1.4rem;
+        font-weight: 600;
+        margin: 0;
+      }
+      h2 {
+        font-size: 1.15rem;
+        font-weight: 600;
+        margin: 0.75rem 0 1rem;
+      }
+      .tagline {
+        font-size: 0.85rem;
+        color: #666;
+        margin: 0.25rem 0 0;
+      }
+      .toolbar {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 0.5rem;
+      }
+      input[type='text'] {
+        flex: 1;
+        padding: 0.5rem 0.75rem;
+        font-size: 1rem;
+        box-sizing: border-box;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        font-family: inherit;
+      }
+      button {
+        font-size: 0.9rem;
+        font-family: inherit;
+        cursor: pointer;
+      }
+      button.primary {
+        padding: 0.5rem 1rem;
+        background: #1a1a1a;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        white-space: nowrap;
+      }
+      button.primary:hover {
+        background: #333;
+      }
+      button.link {
+        background: none;
+        border: none;
+        color: #0066cc;
+        padding: 0;
+        text-decoration: underline;
+      }
+      button.link.danger {
+        color: #cc0000;
+      }
+      .hint {
+        font-size: 0.85rem;
+        color: #666;
+        margin: 0.5rem 0;
+      }
+      .status {
+        font-size: 0.85rem;
+        color: #b00;
+        margin: 0.5rem 0;
+        min-height: 1.2em;
+      }
+      .empty {
+        color: #666;
+        font-style: italic;
+        text-align: center;
+        padding: 2rem 0;
+      }
+      .library-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+      }
+      .library-list li {
+        border-bottom: 1px solid #eee;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+      }
+      .library-list a.library-item {
+        display: flex;
+        flex-direction: column;
+        padding: 0.6rem 0;
+        text-decoration: none;
+        color: inherit;
+        flex: 1;
+      }
+      .library-list a.library-item:hover {
+        background: #f5f5f5;
+      }
+      .lib-title {
+        font-weight: 600;
+      }
+      .lib-composer {
+        font-size: 0.85rem;
+        color: #666;
+      }
+      .lib-footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 1.5rem;
+        padding-top: 1rem;
+        border-top: 1px solid #eee;
+        font-size: 0.85rem;
+        color: #666;
+      }
+      .chart-toolbar {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 0.5rem;
+        font-size: 0.9rem;
+      }
+      .level-nav {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        font-size: 0.9rem;
+        color: #666;
+        margin: 0 0 1.5rem;
+      }
+      .level-nav button {
+        padding: 0.35rem 0.75rem;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        background: white;
+      }
+      .level-nav button:disabled {
+        opacity: 0.4;
+        cursor: default;
+      }
+      #chart-score {
+        overflow-x: auto;
+      }
+      #chart-score pre {
+        font-family: ui-monospace, Menlo, Consolas, monospace;
+        white-space: pre-wrap;
+      }
+      .debug-output {
+        margin-top: 1.5rem;
+        font-size: 0.85rem;
+      }
+      .debug-output summary {
+        cursor: pointer;
+        color: #666;
+      }
+      .debug-output pre {
+        margin: 0.5rem 0 0;
+        padding: 0.75rem;
+        background: #f7f7f7;
+        border: 1px solid #eee;
+        border-radius: 4px;
+        font-family: ui-monospace, Menlo, Consolas, monospace;
+        white-space: pre-wrap;
+        overflow-x: auto;
+      }
+    </style>
+  </body>
+</html>
