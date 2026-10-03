@@ -12,6 +12,7 @@ import { applyNotationModeToChordGrid, parseAbcKey, NOTATION_MODES, type Notatio
 import { DEMO_CHARTS } from './chords-demo-seed';
 import { importIrealLink } from './ireal-import';
 import { importLibraryBackup } from './ireal-backup-import';
+import { parseChartMeta } from './chart-meta';
 
 declare global {
   interface Window {
@@ -197,6 +198,17 @@ function renderAtCurrentLevel(): void {
   document.querySelectorAll<HTMLButtonElement>('button[data-notation]').forEach((btn) => {
     btn.setAttribute('aria-pressed', String(btn.dataset.notation === notation));
   });
+
+  // The symbol view already shows title/tempo through abcjs's own header
+  // engraving; the Nashville/number views bypass abcjs entirely, so this
+  // line is the only place that metadata is visible there.
+  const meta = parseChartMeta(chart.abcx ?? chart.abc);
+  const metaParts = [`Key: ${meta.key}`];
+  if (meta.bpm) metaParts.push(`${meta.bpm} bpm`);
+  if (meta.style) metaParts.push(meta.style);
+  if (meta.groove) metaParts.push(meta.groove);
+  $('chart-meta').innerHTML = metaParts.map((p) => `<span>${escapeHtml(p)}</span>`).join('');
+
   let debugText: string;
   if (notation === 'symbols') {
     // Real chord symbols still go through abcjs for actual staff
