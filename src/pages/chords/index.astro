@@ -38,6 +38,14 @@
       </p>
       <p id="import-status" class="status"></p>
 
+      <div class="toolbar">
+        <label for="import-backup-file" class="file-input-label">
+          Import iRealPro backup (.html)
+          <input id="import-backup-file" type="file" accept=".html,text/html" />
+        </label>
+      </div>
+      <p id="backup-import-status" class="status"></p>
+
       <p id="library-empty" class="empty" hidden>
         No chord charts yet. Paste an iRealPro link above to get started.
       </p>
@@ -121,6 +129,13 @@
         display: flex;
         gap: 0.5rem;
         margin-bottom: 0.5rem;
+      }
+      .file-input-label {
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+        font-size: 0.85rem;
+        color: #666;
       }
       input[type='text'] {
         flex: 1;
@@ -292,11 +307,15 @@
       }
       .number-chart-line {
         display: flex;
-        flex-wrap: wrap;
+        flex-wrap: nowrap;
         align-items: baseline;
         justify-content: space-between;
         width: 100%;
         margin-bottom: 0.6rem;
+      }
+      .number-chart-line .chord,
+      .number-chart-line .bar {
+        flex-shrink: 0;
       }
       #chart-score .chord {
         font-size: 1.3rem;

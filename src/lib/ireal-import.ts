@@ -23,29 +23,9 @@ function parseHeaderField(abc: string, field: 'T' | 'C'): string {
   return match ? match[1].trim() : '';
 }
 
-/**
- * Takes a single `irealb://...` playlist link (iRealPro's export URL
- * format) and returns the first tune it contains as real ABC text, plus
- * its title/composer parsed from the ABC header. If the link contains
- * multiple tunes, only the first is imported — multi-tune playlists are
- * out of scope for this proof of concept.
- */
-export function importIrealLink(link: string): ImportedChart {
-  const trimmed = link.trim();
-  if (!trimmed) throw new Error('Paste an iRealPro link first.');
-  if (!trimmed.startsWith('irealb://')) {
-    throw new Error(
-      'That doesn\'t look like an iRealPro link (expected it to start with "irealb://").',
-    );
-  }
-
-  const abcx = importIrealLinkToAbcx(trimmed);
-  // Multiple tunes are separated by a blank line by importIrealLinkToAbcx;
-  // only the first is used here.
-  const firstTune = abcx.split(/\n\s*\n/)[0];
-
+function convertTuneAbcx(tuneAbcx: string): ImportedChart {
   const ctx = new ABCContext();
-  const abc = convertAbcxToAbc(firstTune, ctx);
+  const abc = convertAbcxToAbc(tuneAbcx, ctx);
   if (ctx.errorReporter.hasErrors()) {
     const messages = ctx.errorReporter
       .getErrors()
@@ -57,5 +37,62 @@ export function importIrealLink(link: string): ImportedChart {
   const title = parseHeaderField(abc, 'T') || 'Untitled';
   const composer = parseHeaderField(abc, 'C') || 'Unknown';
 
-  return { title, composer, abc, abcx: firstTune };
+  return { title, composer, abc, abcx: tuneAbcx };
+}
+
+function validateIrealLink(link: string): string {
+  const trimmed = link.trim();
+  if (!trimmed) throw new Error('Paste an iRealPro link first.');
+  if (!trimmed.startsWith('irealb://')) {
+    throw new Error(
+      'That doesn\'t look like an iRealPro link (expected it to start with "irealb://").',
+    );
+  }
+  return trimmed;
+}
+
+/**
+ * Takes a single `irealb://...` playlist link (iRealPro's export URL
+ * format) and returns the first tune it contains as real ABC text, plus
+ * its title/composer parsed from the ABC header. If the link contains
+ * multiple tunes, only the first is imported — used for the single-link
+ * paste box, where a playlist link is treated as "import its first song".
+ */
+export function importIrealLink(link: string): ImportedChart {
+  const trimmed = validateIrealLink(link);
+  const abcx = importIrealLinkToAbcx(trimmed);
+  // Multiple tunes are separated by a blank line by importIrealLinkToAbcx;
+  // only the first is used here.
+  const firstTune = abcx.split(/\n\s*\n/)[0];
+  return convertTuneAbcx(firstTune);
+}
+
+export interface ImportAllResult {
+  charts: ImportedChart[];
+  // One message per tune that failed to convert, so one malformed song in
+  // a large playlist link doesn't block importing the rest of it.
+  errors: string[];
+}
+
+/**
+ * Takes a single `irealb://...` playlist link and returns every tune it
+ * contains, converting each independently — unlike importIrealLink,
+ * which only imports the first. Used for bulk library-backup import,
+ * where a link is one playlist bundling many songs.
+ */
+export function importAllFromIrealLink(link: string): ImportAllResult {
+  const trimmed = validateIrealLink(link);
+  const abcx = importIrealLinkToAbcx(trimmed);
+  const tunes = abcx.split(/\n\s*\n/).filter((t) => t.trim().length > 0);
+
+  const charts: ImportedChart[] = [];
+  const errors: string[] = [];
+  for (const tune of tunes) {
+    try {
+      charts.push(convertTuneAbcx(tune));
+    } catch (err) {
+      errors.push(err instanceof Error ? err.message : String(err));
+    }
+  }
+  return { charts, errors };
 }

@@ -11,6 +11,7 @@ import { renderNumberChartHtml } from './chord-number-chart';
 import { applyNotationModeToChordGrid, parseAbcKey, NOTATION_MODES, type NotationMode } from './chord-numbers';
 import { DEMO_CHARTS } from './chords-demo-seed';
 import { importIrealLink } from './ireal-import';
+import { importLibraryBackup } from './ireal-backup-import';
 
 declare global {
   interface Window {
@@ -146,6 +147,33 @@ async function runImport(): Promise<void> {
     input.value = '';
     status.textContent = '';
     navigate({ view: 'chart', id: saved.id, level: 1 });
+  } catch (err) {
+    status.textContent = err instanceof Error ? err.message : String(err);
+  }
+}
+
+// Imports every song found in an iRealPro "HTML backup" export (the
+// user's whole library, bundled as a handful of multi-song playlist
+// links) and adds each one to the chart library. Charts whose title and
+// composer already match an existing chart overwrite it (addChordChart's
+// id is derived from title+composer — see chord-key.ts's chordSlug),
+// rather than growing duplicates on a re-import of the same backup.
+async function runBackupImport(file: File): Promise<void> {
+  const status = $('backup-import-status');
+  status.textContent = 'Reading backup file…';
+  try {
+    const html = await file.text();
+    const { charts, errors } = importLibraryBackup(html);
+    status.textContent = `Importing ${charts.length} chart${charts.length === 1 ? '' : 's'}…`;
+    for (const chart of charts) {
+      await addChordChart(chart);
+    }
+    await renderLibrary();
+    const parts = [`Imported ${charts.length} chart${charts.length === 1 ? '' : 's'}.`];
+    if (errors.length > 0) {
+      parts.push(`${errors.length} song${errors.length === 1 ? '' : 's'} could not be converted.`);
+    }
+    status.textContent = parts.join(' ');
   } catch (err) {
     status.textContent = err instanceof Error ? err.message : String(err);
   }
@@ -329,6 +357,13 @@ function bind(): void {
       const demo = DEMO_CHARTS[Number(btn.dataset.demoIndex)];
       if (demo) $<HTMLInputElement>('import-url').value = demo.link;
     });
+  });
+
+  $<HTMLInputElement>('import-backup-file').addEventListener('change', (e) => {
+    const input = e.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = ''; // allow re-selecting the same file to re-import
+    if (file) void runBackupImport(file);
   });
 
   $('btn-chart-back').addEventListener('click', () => navigate({ view: 'library' }));
