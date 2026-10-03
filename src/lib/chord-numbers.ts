@@ -1,9 +1,12 @@
 /**
- * Rewrites chord annotations in ABC-notation chord charts into number
- * notation, iReal Pro-style: the chord root is replaced with a scale
- * degree relative to the chart's key, while the quality suffix (maj7,
- * m7, 7#9, ...) is left exactly as-is — e.g. `"Cmaj7"` becomes `"1maj7"`
- * in the key of C.
+ * Rewrites a plain chord grid (as produced by chord-chart-text.ts's
+ * extractChordChartBody from the chart's ABCx text — never the ABC text,
+ * which encodes each chord as a quoted annotation plus an invisible-rest
+ * run whose count/casing varies by bar length and has repeatedly leaked
+ * into the display) into number notation, iReal Pro-style: each chord's
+ * root is replaced with a scale degree relative to the chart's key,
+ * while the quality suffix (maj7, m7, 7#9, ...) is left exactly as-is —
+ * e.g. `Cmaj7` becomes `1maj7` in the key of C.
  *
  * Two numbering systems are offered, matching iReal Pro's own two modes
  * (see abcls-parser's music-theory/numberNotation module for the degree
@@ -15,10 +18,9 @@
  *     degree numbers instead of being renumbered against the relative
  *     major.
  *
- * This module only rewrites annotation text, the same way chord-cloze.ts
- * only rewrites annotation text for progressive hiding — the two can be
- * applied in sequence (notation first, then cloze) since cloze operates
- * generically on whatever text sits inside the quotes.
+ * This module only rewrites chord tokens, the same way chord-cloze.ts's
+ * applyChordLevelToChordGrid only rewrites chord tokens for progressive
+ * hiding — the two are applied in sequence (notation first, then cloze).
  */
 
 import {
@@ -34,10 +36,6 @@ import type { KeySignature } from 'abcls-parser/types/abcjs-ast';
 export type NotationMode = 'symbols' | 'nashville' | 'numbers';
 
 export const NOTATION_MODES: readonly NotationMode[] = ['symbols', 'nashville', 'numbers'] as const;
-
-// Matches a quoted ABC annotation/chord-symbol, e.g. "Cmaj7" or "F#7b9".
-// Mirrors chord-cloze.ts's CHORD_ANNOTATION_RE.
-const CHORD_ANNOTATION_RE = /"([^"]*)"/g;
 
 function parseKeyMode(str: string): Mode | null {
   switch (str.toLowerCase()) {
@@ -126,12 +124,26 @@ function convertChordText(name: string, key: KeySignature, mode: 'nashville' | '
   return `${convertRoot(main, key, mode)}/${convertRoot(bass, key, mode)}`;
 }
 
+// A chord token always starts with an uppercase note letter (iReal Pro
+// and ABCx both spell chord roots that way); anything else in the grid
+// — bar separators (`|`, `|:`, `:|`), repeat-ending markers (`[1`, `]`),
+// already-blanked cloze placeholders (`----`) — passes through untouched.
+const CHORD_TOKEN_RE = /^[A-G]/;
+
 /**
- * Returns the ABC source text with every chord annotation rewritten to
+ * Returns the plain chord-grid text with every chord token rewritten to
  * the given notation mode. 'symbols' returns the input unchanged.
  */
-export function applyNotationMode(mode: NotationMode, abc: string): string {
-  if (mode === 'symbols') return abc;
-  const key = parseAbcKey(abc);
-  return abc.replace(CHORD_ANNOTATION_RE, (_match, name: string) => `"${convertChordText(name, key, mode)}"`);
+export function applyNotationModeToChordGrid(mode: NotationMode, key: KeySignature, grid: string): string {
+  if (mode === 'symbols') return grid;
+  return grid
+    .split('\n')
+    .map((line) =>
+      line
+        .split(/\s+/)
+        .filter((tok) => tok.length > 0)
+        .map((tok) => (CHORD_TOKEN_RE.test(tok) ? convertChordText(tok, key, mode) : tok))
+        .join(' '),
+    )
+    .join('\n');
 }

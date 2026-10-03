@@ -2,8 +2,10 @@
  * Extracts just the bar/chord grid from an ABC-notation chord chart,
  * dropping header fields (X:, T:, C:, K:, ...) and comment lines (%...),
  * and unwrapping each chord from its ABC annotation syntax (quoted,
- * followed by an invisible-rest run sized to fill its bar, e.g.
- * `"Cm7"x4`) back down to plain chord text (`Cm7`).
+ * followed by an invisible-rest run sized to fill its bar — lowercase
+ * `x4`-style for a partial bar, or a bare uppercase `X` (no count) for a
+ * chord that fills the whole bar, e.g. `"Cm7"x4` or `"Am"X`) back down to
+ * plain chord text (`Cm7`, `Am`).
  *
  * Used for the "copy to clipboard" action: a musician pasting a chart
  * elsewhere (or into a chat, to point out a chord that looks wrong) wants
@@ -20,8 +22,9 @@ function isHeaderLine(line: string): boolean {
 }
 
 // Matches a quoted chord annotation plus the invisible-rest run
-// immediately following it, e.g. `"Cm7"x4` or `"----"x8`.
-const ANNOTATED_CHORD_RE = /"([^"]*)"x?\d*/g;
+// immediately following it, e.g. `"Cm7"x4`, `"----"x8`, or a whole-bar
+// `"Am"X` (uppercase, no count).
+const ANNOTATED_CHORD_RE = /"([^"]*)"[xX]?\d*/g;
 
 export function extractChordChartBody(abc: string): string {
   return abc

@@ -25,6 +25,18 @@ describe('renderNumberChartHtml', () => {
     expect(renderNumberChartHtml('6m7b5 |')).toContain('<span class="chord">6<sup>ø</sup></span>');
   });
 
+  it('drops the redundant 7 when the chart already spells half-diminished as "ø7"', () => {
+    expect(renderNumberChartHtml('6ø7 |')).toContain('<span class="chord">6<sup>ø</sup></span>');
+  });
+
+  it('renders "dim7" as the degree-sign glyph, dropping the redundant 7', () => {
+    expect(renderNumberChartHtml('7dim7 |')).toContain('<span class="chord">7<sup>°</sup></span>');
+  });
+
+  it('renders a plain "dim" (diminished triad) as the degree-sign glyph', () => {
+    expect(renderNumberChartHtml('7dim |')).toContain('<span class="chord">7<sup>°</sup></span>');
+  });
+
   it('renders bar separators without a quality wrapper', () => {
     const html = renderNumberChartHtml('1 | 4 |');
     expect(html).toContain('<span class="bar">|</span>');

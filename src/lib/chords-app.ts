@@ -5,10 +5,10 @@ import {
   listChordCharts,
   type ChordChartRecord,
 } from './chords-db';
-import { applyChordLevel, CHORD_LEVELS, type ChordLevel } from './chord-cloze';
+import { applyChordLevel, applyChordLevelToChordGrid, CHORD_LEVELS, type ChordLevel } from './chord-cloze';
 import { extractChordChartBody } from './chord-chart-text';
 import { renderNumberChartHtml } from './chord-number-chart';
-import { applyNotationMode, NOTATION_MODES, type NotationMode } from './chord-numbers';
+import { applyNotationModeToChordGrid, parseAbcKey, NOTATION_MODES, type NotationMode } from './chord-numbers';
 import { DEMO_CHARTS } from './chords-demo-seed';
 import { importIrealLink } from './ireal-import';
 
@@ -169,8 +169,13 @@ function renderAtCurrentLevel(): void {
   document.querySelectorAll<HTMLButtonElement>('button[data-notation]').forEach((btn) => {
     btn.setAttribute('aria-pressed', String(btn.dataset.notation === notation));
   });
-  const abc = applyChordLevel(level, applyNotationMode(notation, chart.abc));
+  let debugText: string;
   if (notation === 'symbols') {
+    // Real chord symbols still go through abcjs for actual staff
+    // notation — ABC is the right source for that, invisible-rest
+    // filler and all.
+    const abc = applyChordLevel(level, chart.abc);
+    debugText = abc;
     if (window.ABCJS) {
       window.ABCJS.renderAbc('chart-score', abc, {
         responsive: 'resize',
@@ -182,21 +187,30 @@ function renderAtCurrentLevel(): void {
       $('chart-score').innerHTML = `<pre>${escapeHtml(abc)}</pre>`;
     }
   } else {
-    // Nashville/number notation skips staff rendering entirely — there's
-    // no real pitch information to engrave, just a degree chart — and
-    // shows the chord grid as text instead, with each chord's quality
-    // suffix set in a <sup> the way a musician would write it by hand.
-    $('chart-score').innerHTML = renderNumberChartHtml(extractChordChartBody(abc));
+    // Nashville/number notation skips ABC (and staff rendering) entirely
+    // — there's no real pitch information to engrave, just a degree
+    // chart — and works from the chart's ABCx text instead, which is
+    // already a plain chord grid with no invisible-rest filler to leak
+    // through. Falls back to the ABC text for charts saved before the
+    // ABCx field existed.
+    const source = chart.abcx ?? chart.abc;
+    const key = parseAbcKey(source);
+    const grid = extractChordChartBody(source);
+    const converted = applyNotationModeToChordGrid(notation, key, grid);
+    const clozed = applyChordLevelToChordGrid(level, converted);
+    debugText = clozed;
+    $('chart-score').innerHTML = renderNumberChartHtml(clozed);
   }
   const prevBtn = $<HTMLButtonElement>('btn-level-prev');
   const nextBtn = $<HTMLButtonElement>('btn-level-next');
   prevBtn.disabled = level <= 1;
   nextBtn.disabled = level >= CHORD_LEVELS.length;
 
-  // Debug output: the exact ABC text fed to abcjs for this level, and the
-  // ABCx text it was originally converted from, so the conversion
-  // pipeline can be inspected without opening devtools.
-  $('debug-abc-output').textContent = abc;
+  // Debug output: the exact text fed to the renderer for this level
+  // (ABC for the symbol view, a plain chord grid for the number views),
+  // and the ABCx text the chart was originally converted from, so the
+  // conversion pipeline can be inspected without opening devtools.
+  $('debug-abc-output').textContent = debugText;
   $('debug-abcx-output').textContent = chart.abcx ?? '(no ABCx saved for this chart — imported before this field existed)';
 }
 

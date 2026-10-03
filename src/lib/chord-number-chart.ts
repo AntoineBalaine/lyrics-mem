@@ -30,9 +30,18 @@ const DEGREE_PREFIX_RE = /^([#b]?)([1-7])(.*)$/s;
 const ACCIDENTAL_GLYPH: Record<string, string> = { b: '♭', '#': '♯' };
 
 function withQualityGlyphs(quality: string): string {
-  // "maj7" collapses to a bare triangle — the triangle already implies a
-  // major 7th in jazz chord-chart shorthand, so the "7" is redundant.
-  return quality.replace(/m7b5/g, 'ø').replace(/maj7/g, '△').replace(/maj/g, '△');
+  // "maj7" collapses to a bare triangle, and "ø7"/"m7b5" (half-diminished
+  // is already a 7th chord by definition) collapses to a bare ø — in
+  // both cases the "7" is redundant once the glyph itself carries it.
+  // "dim7" becomes the degree sign, the standard jazz-chart shorthand
+  // for a fully diminished 7th chord.
+  return quality
+    .replace(/m7b5/g, 'ø')
+    .replace(/ø7/g, 'ø')
+    .replace(/maj7/g, '△')
+    .replace(/maj/g, '△')
+    .replace(/dim7/g, '°')
+    .replace(/dim/g, '°');
 }
 
 /** Splits one chord token (root/bass parts already separated) into HTML with the quality suffix in a <sup>. */

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyChordLevel } from './chord-cloze';
+import { applyChordLevel, applyChordLevelToChordGrid } from './chord-cloze';
 
 const ONE_CHORD_PER_BAR = [
   'X:1',
@@ -105,5 +105,30 @@ describe('applyChordLevel', () => {
       expect(result).toContain('T:Test');
       expect(result).toContain('K:C');
     }
+  });
+});
+
+describe('applyChordLevelToChordGrid', () => {
+  const PLAIN_GRID = 'C | F | G | Am | Dm | G7 | C | C |';
+
+  it('level 1 leaves the grid unchanged', () => {
+    expect(applyChordLevelToChordGrid(1, PLAIN_GRID)).toBe(PLAIN_GRID);
+  });
+
+  it('level 4 blanks every chord to dashes of the same length', () => {
+    expect(applyChordLevelToChordGrid(4, PLAIN_GRID)).toBe('- | - | - | -- | -- | -- | - | - |');
+  });
+
+  it('level 2 blanks bars 2 and 4 of every 4-bar group', () => {
+    expect(applyChordLevelToChordGrid(2, PLAIN_GRID)).toBe('C | - | G | -- | Dm | -- | C | - |');
+  });
+
+  it('level 3 keeps only the first bar of every 4-bar group', () => {
+    expect(applyChordLevelToChordGrid(3, PLAIN_GRID)).toBe('C | - | - | -- | Dm | -- | - | - |');
+  });
+
+  it('blanks multiple chords within one bar independently', () => {
+    const grid = 'Cm7 F7 | Bbmaj7 Ebmaj7 |';
+    expect(applyChordLevelToChordGrid(2, grid)).toBe('Cm7 F7 | ------ ------ |');
   });
 });

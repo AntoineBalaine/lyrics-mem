@@ -73,17 +73,29 @@ function shouldHideBar(barIndexZeroBased: number, level: ChordLevel): boolean {
 // all, which made abcjs lay that measure out visually narrower/shorter
 // than its neighbors that still carry a chord annotation; keeping a
 // same-length placeholder string preserves the measure's normal width.
-function stripChordsFromBarText(barText: string): string {
+function stripQuotedChordsFromBarText(barText: string): string {
   return barText.replace(CHORD_ANNOTATION_RE, (_match, name: string) => `"${'-'.repeat(name.length)}"`);
 }
 
+// Same blanking idea, for a plain (unquoted) chord grid — each
+// whitespace-delimited chord token is replaced by dashes of the same
+// length.
+function stripPlainChordsFromBarText(barText: string): string {
+  return barText.replace(/\S+/g, (tok) => '-'.repeat(tok.length));
+}
+
 /**
- * Applies a cloze level to one line of ABC tune-body text. Header lines
+ * Applies a cloze level to one line of tune-body text. Header lines
  * (`X:`, `T:`, `C:`, `K:`, etc.) and comment lines (`%...`) are passed
  * through untouched — only lines that look like tune-body content
- * (containing a bar separator or a quoted chord) are processed.
+ * (containing a bar separator or a chord) are processed.
  */
-function applyLevelToLine(line: string, level: ChordLevel, barCounter: { n: number }): string {
+function applyLevelToLine(
+  line: string,
+  level: ChordLevel,
+  barCounter: { n: number },
+  stripChordsFromBarText: (barText: string) => string,
+): string {
   const isHeaderLine = /^[A-Za-z]:/.test(line) || /^%/.test(line);
   if (isHeaderLine) return line;
   if (level === 1) return line;
@@ -107,18 +119,35 @@ function applyLevelToLine(line: string, level: ChordLevel, barCounter: { n: numb
   return result;
 }
 
+function applyChordLevelGeneric(
+  level: ChordLevel,
+  text: string,
+  stripChordsFromBarText: (barText: string) => string,
+): string {
+  if (level === 1) return text;
+  const barCounter = { n: 0 };
+  return text
+    .split('\n')
+    .map((line) => applyLevelToLine(line, level, barCounter, stripChordsFromBarText))
+    .join('\n');
+}
+
 /**
- * Returns the ABC source text for a given cloze level, with chord
+ * Returns the ABC source text for a given cloze level, with quoted chord
  * annotations selectively stripped per the rules above. Bar numbering
  * for the 4-bar grouping runs continuously across the whole tune body
  * (across newlines), matching how a musician reads the chart start to
  * finish.
  */
 export function applyChordLevel(level: ChordLevel, abc: string): string {
-  if (level === 1) return abc;
-  const barCounter = { n: 0 };
-  return abc
-    .split('\n')
-    .map((line) => applyLevelToLine(line, level, barCounter))
-    .join('\n');
+  return applyChordLevelGeneric(level, abc, stripQuotedChordsFromBarText);
+}
+
+/**
+ * Same cloze-level logic, for a plain (unquoted) chord grid — as
+ * produced by chord-chart-text.ts's extractChordChartBody from the
+ * chart's ABCx text — rather than ABC text with quoted annotations.
+ */
+export function applyChordLevelToChordGrid(level: ChordLevel, grid: string): string {
+  return applyChordLevelGeneric(level, grid, stripPlainChordsFromBarText);
 }

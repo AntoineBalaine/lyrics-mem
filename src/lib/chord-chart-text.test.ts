@@ -26,4 +26,9 @@ describe('extractChordChartBody', () => {
     const abc = 'K:C\n"----"x4 "--"x4 |';
     expect(extractChordChartBody(abc)).toBe('---- -- |');
   });
+
+  it('unwraps a whole-bar chord marked with a bare uppercase X (no count), leaving no stray X', () => {
+    const abc = 'K:C\n"Am"X | "Bø7"x4 "E7b9"x4 | "Cmaj7"X |';
+    expect(extractChordChartBody(abc)).toBe('Am | Bø7 E7b9 | Cmaj7 |');
+  });
 });
