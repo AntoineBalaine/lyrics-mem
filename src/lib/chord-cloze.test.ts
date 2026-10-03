@@ -131,4 +131,9 @@ describe('applyChordLevelToChordGrid', () => {
     const grid = 'Cm7 F7 | Bbmaj7 Ebmaj7 |';
     expect(applyChordLevelToChordGrid(2, grid)).toBe('Cm7 F7 | ------ ------ |');
   });
+
+  it("leaves a section-label field visible — the form isn't what's being memorized", () => {
+    const grid = '[P:A] C | F | G | Am |';
+    expect(applyChordLevelToChordGrid(4, grid)).toBe('[P:A] - | - | - | -- |');
+  });
 });

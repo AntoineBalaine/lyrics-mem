@@ -77,11 +77,18 @@ function stripQuotedChordsFromBarText(barText: string): string {
   return barText.replace(CHORD_ANNOTATION_RE, (_match, name: string) => `"${'-'.repeat(name.length)}"`);
 }
 
+// ABC's inline part-marker field (e.g. "[P:A]"), which marks where a
+// section begins. Not a chord, so cloze hiding leaves it alone: the
+// point of hiding chords is to practice recalling them, and that is
+// easier, not harder, when you can still see the form you're recalling
+// them within.
+const SECTION_LABEL_TOKEN = /^\[P:\w\]$/;
+
 // Same blanking idea, for a plain (unquoted) chord grid — each
 // whitespace-delimited chord token is replaced by dashes of the same
 // length.
 function stripPlainChordsFromBarText(barText: string): string {
-  return barText.replace(/\S+/g, (tok) => '-'.repeat(tok.length));
+  return barText.replace(/\S+/g, (tok) => (SECTION_LABEL_TOKEN.test(tok) ? tok : '-'.repeat(tok.length)));
 }
 
 /**
