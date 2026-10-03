@@ -48,13 +48,15 @@ describe('applyNotationModeToChordGrid', () => {
     expect(result).toContain('3maj7'); // Cmaj7 — diatonic 3rd of natural minor, no flat needed
   });
 
-  it('nashville mode renumbers the same minor-key chords against the major scale', () => {
+  it('nashville mode reads a minor key off its relative major, not off the minor tonic itself', () => {
+    // A minor's relative major is C major, so Am7 (the tonic chord) reads
+    // as the relative major's vi — "6" — not "1".
     const key = parseAbcKey(A_MINOR_KEY_HEADER);
     const result = applyNotationModeToChordGrid('nashville', key, A_MINOR_GRID);
-    expect(result).toContain('1m7');
-    expect(result).toContain('4m7');
-    expect(result).toContain('b77'); // G is a minor 7th, flat relative to A major
-    expect(result).toContain('b3maj7'); // C is a minor 3rd, flat relative to A major
+    expect(result).toContain('6m7'); // Am7 — tonic, vi of the relative major (C)
+    expect(result).toContain('2m7'); // Dm7
+    expect(result).toContain('57'); // G7
+    expect(result).toContain('1maj7'); // Cmaj7 — the relative major's own tonic
   });
 
   it('leaves non-chord tokens (bar separators) untouched', () => {
