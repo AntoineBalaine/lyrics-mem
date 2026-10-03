@@ -18,7 +18,7 @@
     "import": "tsx scripts/import.ts"
   },
   "dependencies": {
-    "abcls-parser": "file:../AbcLs/parse",
+    "abcls-parser": "file:../AbcLs-ireal/parse",
     "astro": "^5.0.0",
     "idb": "^8.0.3",
     "minisearch": "^7.0.0",

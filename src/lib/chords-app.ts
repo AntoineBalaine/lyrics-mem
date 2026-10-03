@@ -6,6 +6,9 @@ import {
   type ChordChartRecord,
 } from './chords-db';
 import { applyChordLevel, CHORD_LEVELS, type ChordLevel } from './chord-cloze';
+import { extractChordChartBody } from './chord-chart-text';
+import { renderNumberChartHtml } from './chord-number-chart';
+import { applyNotationMode, NOTATION_MODES, type NotationMode } from './chord-numbers';
 import { DEMO_CHARTS } from './chords-demo-seed';
 import { importIrealLink } from './ireal-import';
 
@@ -27,6 +30,11 @@ interface UrlState {
   view: View;
   id?: string;
   level?: ChordLevel;
+  notation?: NotationMode;
+}
+
+function readNotationMode(raw: string | null): NotationMode {
+  return (NOTATION_MODES as readonly string[]).includes(raw ?? '') ? (raw as NotationMode) : 'symbols';
 }
 
 function readUrl(): UrlState {
@@ -35,7 +43,8 @@ function readUrl(): UrlState {
   const id = p.get('id') ?? undefined;
   const rawLevel = parseInt(p.get('level') ?? '1', 10);
   const level = (Number.isFinite(rawLevel) ? Math.max(1, Math.min(4, rawLevel)) : 1) as ChordLevel;
-  return { view, id, level };
+  const notation = readNotationMode(p.get('notation'));
+  return { view, id, level, notation };
 }
 
 function writeUrl(state: UrlState, push: boolean): void {
@@ -44,6 +53,9 @@ function writeUrl(state: UrlState, push: boolean): void {
   if (state.id) p.set('id', state.id);
   if (state.view === 'chart' && state.level && state.level !== 1) {
     p.set('level', String(state.level));
+  }
+  if (state.view === 'chart' && state.notation && state.notation !== 'symbols') {
+    p.set('notation', state.notation);
   }
   const qs = p.toString();
   const url = qs ? `?${qs}` : location.pathname;
@@ -146,23 +158,35 @@ async function runImport(): Promise<void> {
 interface ChartViewState {
   chart: ChordChartRecord;
   level: ChordLevel;
+  notation: NotationMode;
 }
 let chartView: ChartViewState | null = null;
 
 function renderAtCurrentLevel(): void {
   if (!chartView) return;
-  const { chart, level } = chartView;
+  const { chart, level, notation } = chartView;
   $('chart-level-num').textContent = String(level);
-  const abc = applyChordLevel(level, chart.abc);
-  if (window.ABCJS) {
-    window.ABCJS.renderAbc('chart-score', abc, {
-      responsive: 'resize',
-      staffwidth: 700,
-    });
+  document.querySelectorAll<HTMLButtonElement>('button[data-notation]').forEach((btn) => {
+    btn.setAttribute('aria-pressed', String(btn.dataset.notation === notation));
+  });
+  const abc = applyChordLevel(level, applyNotationMode(notation, chart.abc));
+  if (notation === 'symbols') {
+    if (window.ABCJS) {
+      window.ABCJS.renderAbc('chart-score', abc, {
+        responsive: 'resize',
+        staffwidth: 700,
+      });
+    } else {
+      // abcjs failed to load from the CDN (e.g. offline dev) — fall back to
+      // showing the raw ABC text so the level-hiding logic is still visible.
+      $('chart-score').innerHTML = `<pre>${escapeHtml(abc)}</pre>`;
+    }
   } else {
-    // abcjs failed to load from the CDN (e.g. offline dev) — fall back to
-    // showing the raw ABC text so the level-hiding logic is still visible.
-    $('chart-score').innerHTML = `<pre>${escapeHtml(abc)}</pre>`;
+    // Nashville/number notation skips staff rendering entirely — there's
+    // no real pitch information to engrave, just a degree chart — and
+    // shows the chord grid as text instead, with each chord's quality
+    // suffix set in a <sup> the way a musician would write it by hand.
+    $('chart-score').innerHTML = renderNumberChartHtml(extractChordChartBody(abc));
   }
   const prevBtn = $<HTMLButtonElement>('btn-level-prev');
   const nextBtn = $<HTMLButtonElement>('btn-level-next');
@@ -176,13 +200,13 @@ function renderAtCurrentLevel(): void {
   $('debug-abcx-output').textContent = chart.abcx ?? '(no ABCx saved for this chart — imported before this field existed)';
 }
 
-async function renderChart(id: string, level: ChordLevel): Promise<void> {
+async function renderChart(id: string, level: ChordLevel, notation: NotationMode): Promise<void> {
   const chart = await getChordChart(id);
   if (!chart) {
     navigate({ view: 'library' });
     return;
   }
-  chartView = { chart, level };
+  chartView = { chart, level, notation };
   $('chart-title').textContent = `${chart.title} — ${chart.composer}`;
   document.title = `${chart.title} - ${chart.composer}`;
   renderAtCurrentLevel();
@@ -192,7 +216,66 @@ function setLevel(level: ChordLevel): void {
   if (!chartView) return;
   chartView.level = level;
   renderAtCurrentLevel();
-  writeUrl({ view: 'chart', id: chartView.chart.id, level }, true);
+  writeUrl({ view: 'chart', id: chartView.chart.id, level, notation: chartView.notation }, true);
+}
+
+let copyStatusTimer: ReturnType<typeof setTimeout> | undefined;
+
+function showCopyStatus(text: string): void {
+  const status = $('copy-status');
+  status.textContent = text;
+  clearTimeout(copyStatusTimer);
+  copyStatusTimer = setTimeout(() => {
+    status.textContent = '';
+  }, 2000);
+}
+
+// Falls back to the legacy execCommand('copy') path via a hidden textarea
+// when navigator.clipboard is unavailable — notably, Clipboard.writeText
+// requires a secure context (HTTPS or localhost), which plain
+// http://debianhome.local does not qualify as.
+function legacyCopy(text: string): boolean {
+  const textarea = document.createElement('textarea');
+  textarea.value = text;
+  textarea.style.position = 'fixed';
+  textarea.style.opacity = '0';
+  document.body.appendChild(textarea);
+  textarea.focus();
+  textarea.select();
+  let ok = false;
+  try {
+    ok = document.execCommand('copy');
+  } finally {
+    textarea.remove();
+  }
+  return ok;
+}
+
+// Copies just the chord-chart body (bar lines with chord annotations) —
+// not the X:/T:/C:/K: headers or source-link comment that precede it in
+// the raw ABC text — reflecting whatever's currently on screen (cloze
+// level and notation mode included).
+async function copyCurrentAbc(): Promise<void> {
+  const fullAbc = $('debug-abc-output').textContent ?? '';
+  const abc = extractChordChartBody(fullAbc);
+  if (!abc) return;
+  if (navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(abc);
+      showCopyStatus('Copied!');
+      return;
+    } catch {
+      // Fall through to the legacy path below.
+    }
+  }
+  showCopyStatus(legacyCopy(abc) ? 'Copied!' : 'Copy failed — select the ABC text below manually.');
+}
+
+function setNotationMode(notation: NotationMode): void {
+  if (!chartView) return;
+  chartView.notation = notation;
+  renderAtCurrentLevel();
+  writeUrl({ view: 'chart', id: chartView.chart.id, level: chartView.level, notation }, true);
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -212,9 +295,10 @@ async function route(): Promise<void> {
         return;
       }
       if (!chartView || chartView.chart.id !== state.id) {
-        await renderChart(state.id, state.level ?? 1);
+        await renderChart(state.id, state.level ?? 1, state.notation ?? 'symbols');
       } else {
         chartView.level = state.level ?? 1;
+        chartView.notation = state.notation ?? 'symbols';
         renderAtCurrentLevel();
       }
       break;
@@ -242,6 +326,14 @@ function bind(): void {
       setLevel((chartView.level + 1) as ChordLevel);
     }
   });
+
+  document.querySelectorAll<HTMLButtonElement>('button[data-notation]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      setNotationMode(readNotationMode(btn.dataset.notation ?? null));
+    });
+  });
+
+  $('btn-copy-abc').addEventListener('click', () => void copyCurrentAbc());
 
   window.addEventListener('popstate', () => {
     void route();
