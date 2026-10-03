@@ -71,4 +71,10 @@ describe('renderNumberChartHtml', () => {
     expect(html).toContain('<span class="chord">----</span>');
     expect(html).toContain('<span class="chord">--</span>');
   });
+
+  it('renders a "[P:X]" section-label field as just the bare letter, styled distinctly', () => {
+    const html = renderNumberChartHtml('[P:A] 1maj7 | 2m7 |');
+    expect(html).toContain('<span class="section-label">A</span>');
+    expect(html).not.toContain('[P:A]');
+  });
 });

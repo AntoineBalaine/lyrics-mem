@@ -46,9 +46,23 @@
       </div>
       <p id="backup-import-status" class="status"></p>
 
+      <div class="toolbar">
+        <input
+          id="library-search"
+          type="text"
+          placeholder="Search charts by title or composer…"
+          autocomplete="off"
+        />
+        <select id="library-sort" aria-label="Sort charts">
+          <option value="recent">Recently added</option>
+          <option value="title">Title (A-Z)</option>
+        </select>
+      </div>
+
       <p id="library-empty" class="empty" hidden>
         No chord charts yet. Paste an iRealPro link above to get started.
       </p>
+      <p id="library-no-results" class="empty" hidden>No charts match your search.</p>
       <ul id="library-list" class="library-list"></ul>
       <footer class="lib-footer">
         <span id="library-count"></span>
@@ -138,6 +152,14 @@
         display: flex;
         gap: 0.5rem;
         margin-bottom: 0.5rem;
+      }
+      #library-sort {
+        padding: 0.5rem 0.75rem;
+        font-size: 0.9rem;
+        font-family: inherit;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        background: white;
       }
       .file-input-label {
         display: flex;
@@ -338,6 +360,19 @@
       #chart-score .bar {
         color: #999;
         margin: 0 0.3rem;
+      }
+      #chart-score .section-label {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 1.5rem;
+        height: 1.5rem;
+        margin-right: 0.4rem;
+        border: 1px solid #1a1a1a;
+        border-radius: 3px;
+        font-size: 0.9rem;
+        font-weight: 700;
+        flex-shrink: 0;
       }
       .debug-output {
         margin-top: 1.5rem;

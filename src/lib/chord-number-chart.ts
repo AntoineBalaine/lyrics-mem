@@ -54,7 +54,17 @@ function renderChordPart(part: string): string {
   return `${escapeHtml(degree)}<sup>${escapeHtml(withQualityGlyphs(quality))}</sup>`;
 }
 
+// ABC's own inline part-marker field, "[P:A]" — written this way (not a
+// bare "[A]") so it survives conversion to real ABC without colliding
+// with ABC's bracket/inline-field syntax (see importFromIreal.ts's
+// cellText). Shown here as just the bare letter, styled distinctly.
+const SECTION_LABEL_TOKEN = /^\[P:(\w)\]$/;
+
 function renderChordToken(token: string): string {
+  const sectionLabel = SECTION_LABEL_TOKEN.exec(token);
+  if (sectionLabel) {
+    return `<span class="section-label">${escapeHtml(sectionLabel[1])}</span>`;
+  }
   if (token === '|' || /^[|[\]:]+$/.test(token)) {
     return `<span class="bar">${escapeHtml(token)}</span>`;
   }

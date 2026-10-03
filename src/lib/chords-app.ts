@@ -93,12 +93,31 @@ function showView(view: View): void {
 // Library view
 // ─────────────────────────────────────────────────────────────
 
+type LibrarySort = 'recent' | 'title';
+
+// Kept at module scope rather than re-read from the DOM each render so
+// they survive a full renderLibrary() re-render (e.g. after a delete)
+// without losing what the user had typed/selected.
+let librarySearch = '';
+let librarySort: LibrarySort = 'recent';
+
 async function renderLibrary(): Promise<void> {
-  const charts = await listChordCharts();
-  charts.sort((a, b) => b.savedAt - a.savedAt);
+  const allCharts = await listChordCharts();
+
+  const query = librarySearch.trim().toLowerCase();
+  const charts = query
+    ? allCharts.filter((c) => c.title.toLowerCase().includes(query) || c.composer.toLowerCase().includes(query))
+    : allCharts;
+
+  if (librarySort === 'title') {
+    charts.sort((a, b) => a.title.localeCompare(b.title));
+  } else {
+    charts.sort((a, b) => b.savedAt - a.savedAt);
+  }
 
   const list = $<HTMLUListElement>('library-list');
   const empty = $('library-empty');
+  const noResults = $('library-no-results');
 
   list.innerHTML = charts
     .map(
@@ -113,7 +132,8 @@ async function renderLibrary(): Promise<void> {
     )
     .join('');
 
-  empty.hidden = charts.length > 0;
+  empty.hidden = allCharts.length > 0;
+  noResults.hidden = allCharts.length === 0 || charts.length > 0;
   $('library-count').textContent = `${charts.length} chart${charts.length === 1 ? '' : 's'}`;
 
   list.querySelectorAll<HTMLAnchorElement>('a.library-item').forEach((a) => {
@@ -360,6 +380,15 @@ async function route(): Promise<void> {
 }
 
 function bind(): void {
+  $<HTMLInputElement>('library-search').addEventListener('input', (e) => {
+    librarySearch = (e.target as HTMLInputElement).value;
+    void renderLibrary();
+  });
+  $<HTMLSelectElement>('library-sort').addEventListener('change', (e) => {
+    librarySort = (e.target as HTMLSelectElement).value as LibrarySort;
+    void renderLibrary();
+  });
+
   $('btn-import').addEventListener('click', () => void runImport());
   $<HTMLInputElement>('import-url').addEventListener('keydown', (e) => {
     if ((e as KeyboardEvent).key === 'Enter') void runImport();
