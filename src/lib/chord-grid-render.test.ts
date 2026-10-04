@@ -251,19 +251,37 @@ describe('renderGridHtml', () => {
 
   it('blanks a chord in the HTML view as well', () => {
     const out = html('C^7 ', 'symbols', 'C', 5);
-    expect(out).to.contain('-----');
+    // Two dashes, because "C" and the triangle are what this view shows.
+    expect(out).to.contain('--');
     expect(out).to.not.contain('<sup>');
   });
 
-  it('prints the same number of dashes in both outputs for one chord', () => {
-    // The two would otherwise disagree, since the glyph spelling is shorter
-    // than the ASCII one.
+  it('blanks each output to the width that output would have printed', () => {
+    // Dashes stand in for what was hidden, so they are as wide as the
+    // spelling the output doing the printing uses: a major seventh is one
+    // triangle on screen and four characters in the clipboard. Taking both
+    // from the ASCII spelling drew four dashes where the page had shown one
+    // glyph, which reads as a longer chord than the one being hidden.
     const plain = text('C^7 ', 'symbols', 'C', 5).match(/-+/)?.[0] ?? '';
     // Matched inside the chord element, since the markup's own class names
     // contain hyphens of their own.
     const rendered = html('C^7 ', 'symbols', 'C', 5).match(/class="chord">(-+)</)?.[1] ?? '';
-    expect(plain.length).to.be.greaterThan(0);
-    expect(rendered).to.equal(plain);
+    expect(plain).to.equal('-----');
+    expect(rendered).to.equal('--');
+  });
+
+  it('blanks a quality to the width of the glyph it replaces', () => {
+    // A major seventh shows as a triangle, so one dash stands in for it
+    // rather than the four of "maj7".
+    const out = html('C^7 ', 'symbols', 'C', 2);
+    expect(out).to.contain('<sup>-</sup>');
+    expect(out).to.contain('C<sup>');
+  });
+
+  it('blanks a longer quality to its own glyph width', () => {
+    // A dominant seventh with a flattened ninth shows as "7b9", three
+    // characters, so three dashes stand in for it.
+    expect(html('C7b9 ', 'symbols', 'C', 2)).to.contain('<sup>---</sup>');
   });
 
   it('writes an augmented seventh as a raised fifth rather than as aug7', () => {

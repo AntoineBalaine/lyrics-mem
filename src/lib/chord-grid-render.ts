@@ -278,23 +278,37 @@ function dashes(width: number): string {
   return '-'.repeat(Math.max(1, width));
 }
 
-function hiddenText(chord: ParsedChord | null, opts: RenderOptions, fallbackWidth: number): string {
+/**
+ * A chord hidden, as dashes standing in for what would have been printed.
+ *
+ * The width is taken from the spelling the output doing the printing would
+ * itself have used, which is why it depends on `glyphs`: a major seventh
+ * shows as a single triangle on screen and as "maj7" in the clipboard, so
+ * one dash stands in for it on screen and four in the clipboard. Taking
+ * both widths from the ASCII spelling instead printed four dashes where
+ * the chart had shown one glyph, which reads as a longer chord than the
+ * one being hidden.
+ */
+function hiddenText(
+  chord: ParsedChord | null,
+  opts: RenderOptions,
+  glyphs: boolean,
+  fallbackWidth: number,
+): string {
   if (!chord) return dashes(fallbackWidth);
-  const parts = chordParts(chord, opts, false);
+  const parts = chordParts(chord, opts, glyphs);
   return dashes((parts.root + parts.quality + parts.bass).length);
 }
 
 /**
- * A chord's quality blanked, its root and bass left in place.
+ * The width of the quality a chord's own root keeps in place of.
  *
- * The dash run is as wide as the quality's own ASCII spelling, for the
- * same reason a wholly hidden chord is: the two outputs must not print
- * different numbers of dashes for one chord. A chord with no quality to
- * speak of, a bare major triad, is left as it is rather than given a dash
- * that stands for nothing.
+ * Zero for a chord with no quality to speak of, a bare major triad among
+ * them, which is then left as it is rather than given a dash standing for
+ * nothing.
  */
-function qualityHiddenWidth(chord: ParsedChord, opts: RenderOptions): number {
-  return chordParts(chord, opts, false).quality.length;
+function qualityHiddenWidth(chord: ParsedChord, opts: RenderOptions, glyphs: boolean): number {
+  return chordParts(chord, opts, glyphs).quality.length;
 }
 
 function wholeChordText(chord: ParsedChord, opts: RenderOptions, glyphs: boolean): string {
@@ -303,10 +317,10 @@ function wholeChordText(chord: ParsedChord, opts: RenderOptions, glyphs: boolean
 }
 
 function chordTextAt(chord: ParsedChord, opts: RenderOptions, glyphs: boolean, hiding: BarHiding): string {
-  if (hiding === 'all') return hiddenText(chord, opts, 0);
+  if (hiding === 'all') return hiddenText(chord, opts, glyphs, 0);
   const parts = chordParts(chord, opts, glyphs);
   if (hiding === 'quality') {
-    const width = qualityHiddenWidth(chord, opts);
+    const width = qualityHiddenWidth(chord, opts, glyphs);
     return parts.root + (width === 0 ? '' : dashes(width)) + parts.bass;
   }
   return parts.root + parts.quality + parts.bass;
@@ -323,7 +337,7 @@ function cellText(cell: LaidOutCell, opts: RenderOptions, glyphs: boolean, hidin
     // A cell naming no chord has no quality to take away, so only the
     // level that hides everything touches it.
     const own = cellWithoutChordText(cell, opts, glyphs);
-    const shown = hiding === 'all' && own !== '' ? hiddenText(null, opts, own.length) : own;
+    const shown = hiding === 'all' && own !== '' ? hiddenText(null, opts, glyphs, own.length) : own;
     return shown + alternative;
   }
   return chordTextAt(cell.chord, opts, glyphs, hiding) + alternative;
@@ -382,10 +396,13 @@ function cellHtml(cell: LaidOutCell, opts: RenderOptions, hiding: BarHiding): st
   // by hand, so a blanked quality is drawn as a superscript too and sits
   // where the quality it stands for would have been.
   const render = (chord: ParsedChord): string => {
-    if (hiding === 'all') return escapeHtml(hiddenText(chord, opts, 0));
+    if (hiding === 'all') return escapeHtml(hiddenText(chord, opts, true, 0));
     const parts = chordParts(chord, opts, true);
-    const text = hiding === 'quality' ? dashes(qualityHiddenWidth(chord, opts)) : parts.quality;
-    const width = hiding === 'quality' ? qualityHiddenWidth(chord, opts) : parts.quality.length;
+    // The width comes from the glyph spelling, since that is what this
+    // output would have shown: a major seventh is one triangle here, so
+    // one dash stands in for it rather than the four of "maj7".
+    const width = hiding === 'quality' ? qualityHiddenWidth(chord, opts, true) : parts.quality.length;
+    const text = hiding === 'quality' ? dashes(width) : parts.quality;
     const quality = width === 0 ? '' : `<sup>${escapeHtml(text)}</sup>`;
     return `${escapeHtml(parts.root)}${quality}${escapeHtml(parts.bass)}`;
   };
@@ -394,7 +411,7 @@ function cellHtml(cell: LaidOutCell, opts: RenderOptions, hiding: BarHiding): st
   if (!cell.chord) {
     const own = cellWithoutChordText(cell, opts, true);
     if (own === '' && alternative === '') return '';
-    const shown = hiding === 'all' && own !== '' ? hiddenText(null, opts, own.length) : own;
+    const shown = hiding === 'all' && own !== '' ? hiddenText(null, opts, true, own.length) : own;
     return `<span class="chord${small}">${escapeHtml(shown)}${alternative}</span>`;
   }
   return `<span class="chord${small}">${render(cell.chord)}${alternative}</span>`;
