@@ -47,9 +47,20 @@ describe('renderGridText', () => {
     expect(text('C-7 |F7 |Bb^7 ', 'nashville', 'C-')).to.equal('| 6m7 | 27 | 5maj7 ||');
   });
 
-  it('reads regular number notation against the song own tonic', () => {
-    // The same chart in the same key, counted from C rather than from Eb.
-    expect(text('C-7 |F7 |Bb^7 ', 'numbers', 'C-')).to.equal('| 1m7 | 47 | 7maj7 ||');
+  it('reads regular number notation against the parallel major of the song tonic', () => {
+    // The same chart in the same key, counted from C rather than from Eb,
+    // and spelled against C major, so Bb is the flattened seventh. A
+    // degree's accidental then always means a departure from a major
+    // scale, whatever mode the song is in.
+    expect(text('C-7 |F7 |Bb^7 ', 'numbers', 'C-')).to.equal('| 1m7 | 47 | b7maj7 ||');
+  });
+
+  it('spells a minor key degree the way iReal Pro does, against the parallel major', () => {
+    // A minor read against A major: C is a semitone under that scale's
+    // third, G a semitone under its seventh, and F sharp is its own sixth.
+    expect(text('A-7 |C^7 |G7 |F#-7b5 ', 'numbers', 'A-')).to.equal(
+      '| 1m7 | b3maj7 | b77 | 6m7b5 ||',
+    );
   });
 
   it('keeps a slash bass and converts it in the number views', () => {
