@@ -311,11 +311,6 @@ function qualityHiddenWidth(chord: ParsedChord, opts: RenderOptions, glyphs: boo
   return chordParts(chord, opts, glyphs).quality.length;
 }
 
-function wholeChordText(chord: ParsedChord, opts: RenderOptions, glyphs: boolean): string {
-  const parts = chordParts(chord, opts, glyphs);
-  return parts.root + parts.quality + parts.bass;
-}
-
 function chordTextAt(chord: ParsedChord, opts: RenderOptions, glyphs: boolean, hiding: BarHiding): string {
   if (hiding === 'all') return hiddenText(chord, opts, glyphs, 0);
   const parts = chordParts(chord, opts, glyphs);
