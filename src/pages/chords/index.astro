@@ -85,7 +85,6 @@
         <button id="btn-chart-back" class="link">← Charts</button>
       </div>
       <h2 id="chart-title"></h2>
-      <p id="chart-meta" class="chart-meta"></p>
       <nav class="level-nav">
         <button id="btn-level-prev">← level</button>
         <span>Level <span id="chart-level-num">1</span> / 4</span>
@@ -96,6 +95,7 @@
         <button type="button" data-notation="nashville" aria-pressed="false">Nashville numbers</button>
         <button type="button" data-notation="numbers" aria-pressed="false">Number notation</button>
       </nav>
+      <p id="chart-meta" class="chart-meta"></p>
       <div class="score-toolbar">
         <span id="copy-status" class="copy-status" aria-live="polite"></span>
         <button id="btn-copy-chart" type="button" class="icon-button" title="Copy chord chart to clipboard" aria-label="Copy chord chart to clipboard">
@@ -140,7 +140,7 @@
       .chart-meta {
         font-size: 0.85rem;
         color: #666;
-        margin: -0.75rem 0 1rem;
+        margin: 1rem 0 0;
       }
       .chart-meta span + span::before {
         content: ' · ';
