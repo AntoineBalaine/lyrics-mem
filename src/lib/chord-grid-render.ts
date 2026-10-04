@@ -20,7 +20,7 @@ import type { Barline, ChartLayout, LaidOutBar, LaidOutCell } from 'abcls-parser
 import { ChordQuality, type ParsedChord } from 'abcls-parser';
 import { KeyAccidental, type KeyRoot, type KeySignature } from 'abcls-parser/types/abcjs-ast';
 import { formatDegree, nashvilleDegree, regularDegree } from 'abcls-parser/music-theory/numberNotation';
-import { shouldHideBarAt, type ChordLevel } from './chord-cloze';
+import { barHiding, type BarHiding, type ChordLevel } from './chord-cloze';
 import type { NotationMode } from './chord-numbers';
 
 export interface RenderOptions {
@@ -274,10 +274,27 @@ function endingNumberStarts(layout: ChartLayout): Set<number> {
  * otherwise print different numbers of dashes for the same chord and a
  * reader comparing the page against the clipboard would see two charts.
  */
+function dashes(width: number): string {
+  return '-'.repeat(Math.max(1, width));
+}
+
 function hiddenText(chord: ParsedChord | null, opts: RenderOptions, fallbackWidth: number): string {
-  if (!chord) return '-'.repeat(Math.max(1, fallbackWidth));
+  if (!chord) return dashes(fallbackWidth);
   const parts = chordParts(chord, opts, false);
-  return '-'.repeat(Math.max(1, (parts.root + parts.quality + parts.bass).length));
+  return dashes((parts.root + parts.quality + parts.bass).length);
+}
+
+/**
+ * A chord's quality blanked, its root and bass left in place.
+ *
+ * The dash run is as wide as the quality's own ASCII spelling, for the
+ * same reason a wholly hidden chord is: the two outputs must not print
+ * different numbers of dashes for one chord. A chord with no quality to
+ * speak of, a bare major triad, is left as it is rather than given a dash
+ * that stands for nothing.
+ */
+function qualityHiddenWidth(chord: ParsedChord, opts: RenderOptions): number {
+  return chordParts(chord, opts, false).quality.length;
 }
 
 function wholeChordText(chord: ParsedChord, opts: RenderOptions, glyphs: boolean): string {
@@ -285,25 +302,36 @@ function wholeChordText(chord: ParsedChord, opts: RenderOptions, glyphs: boolean
   return parts.root + parts.quality + parts.bass;
 }
 
-function cellText(cell: LaidOutCell, opts: RenderOptions, glyphs: boolean, hidden: boolean): string {
+function chordTextAt(chord: ParsedChord, opts: RenderOptions, glyphs: boolean, hiding: BarHiding): string {
+  if (hiding === 'all') return hiddenText(chord, opts, 0);
+  const parts = chordParts(chord, opts, glyphs);
+  if (hiding === 'quality') {
+    const width = qualityHiddenWidth(chord, opts);
+    return parts.root + (width === 0 ? '' : dashes(width)) + parts.bass;
+  }
+  return parts.root + parts.quality + parts.bass;
+}
+
+function cellText(cell: LaidOutCell, opts: RenderOptions, glyphs: boolean, hiding: BarHiding): string {
   // An alternative chord is read even on a cell that names no chord of its
   // own, which four cells in the library do, so it is rendered from the
   // cell rather than from inside the chord branch.
   const alternative = cell.alternative
-    ? ` (${hidden ? hiddenText(cell.alternative, opts, 0) : wholeChordText(cell.alternative, opts, glyphs)})`
+    ? ` (${chordTextAt(cell.alternative, opts, glyphs, hiding)})`
     : '';
   if (!cell.chord) {
+    // A cell naming no chord has no quality to take away, so only the
+    // level that hides everything touches it.
     const own = cellWithoutChordText(cell, opts, glyphs);
-    const shown = hidden && own !== '' ? hiddenText(null, opts, own.length) : own;
+    const shown = hiding === 'all' && own !== '' ? hiddenText(null, opts, own.length) : own;
     return shown + alternative;
   }
-  const own = hidden ? hiddenText(cell.chord, opts, 0) : wholeChordText(cell.chord, opts, glyphs);
-  return own + alternative;
+  return chordTextAt(cell.chord, opts, glyphs, hiding) + alternative;
 }
 
 function barText(bar: LaidOutBar, opts: RenderOptions, glyphs: boolean): string {
-  const hidden = shouldHideBarAt(bar.indexInChart, opts.level);
-  const cells = bar.cells.map((cell) => cellText(cell, opts, glyphs, hidden)).filter((text) => text !== '');
+  const hiding = barHiding(bar.indexInChart, opts.level);
+  const cells = bar.cells.map((cell) => cellText(cell, opts, glyphs, hiding)).filter((text) => text !== '');
   return cells.join(' ');
 }
 
@@ -349,13 +377,16 @@ export function renderGridText(layout: ChartLayout, opts: RenderOptions): string
   return lines.join('\n');
 }
 
-function cellHtml(cell: LaidOutCell, opts: RenderOptions, hidden: boolean): string {
+function cellHtml(cell: LaidOutCell, opts: RenderOptions, hiding: BarHiding): string {
   // The quality is set in a superscript, the way a number chart is written
-  // by hand, and a hidden chord becomes dashes.
+  // by hand, so a blanked quality is drawn as a superscript too and sits
+  // where the quality it stands for would have been.
   const render = (chord: ParsedChord): string => {
-    if (hidden) return escapeHtml(hiddenText(chord, opts, 0));
+    if (hiding === 'all') return escapeHtml(hiddenText(chord, opts, 0));
     const parts = chordParts(chord, opts, true);
-    const quality = parts.quality === '' ? '' : `<sup>${escapeHtml(parts.quality)}</sup>`;
+    const text = hiding === 'quality' ? dashes(qualityHiddenWidth(chord, opts)) : parts.quality;
+    const width = hiding === 'quality' ? qualityHiddenWidth(chord, opts) : parts.quality.length;
+    const quality = width === 0 ? '' : `<sup>${escapeHtml(text)}</sup>`;
     return `${escapeHtml(parts.root)}${quality}${escapeHtml(parts.bass)}`;
   };
   const alternative = cell.alternative ? ` <span class="alternative">(${render(cell.alternative)})</span>` : '';
@@ -363,7 +394,7 @@ function cellHtml(cell: LaidOutCell, opts: RenderOptions, hidden: boolean): stri
   if (!cell.chord) {
     const own = cellWithoutChordText(cell, opts, true);
     if (own === '' && alternative === '') return '';
-    const shown = hidden && own !== '' ? hiddenText(null, opts, own.length) : own;
+    const shown = hiding === 'all' && own !== '' ? hiddenText(null, opts, own.length) : own;
     return `<span class="chord${small}">${escapeHtml(shown)}${alternative}</span>`;
   }
   return `<span class="chord${small}">${render(cell.chord)}${alternative}</span>`;
@@ -403,8 +434,8 @@ export function renderGridHtml(layout: ChartLayout, opts: RenderOptions): string
       if (bar.endingNumber !== undefined && endingStarts.has(bar.indexInChart)) {
         parts.push(`<span class="ending">${bar.endingNumber}.</span>`);
       }
-      const hidden = shouldHideBarAt(bar.indexInChart, opts.level);
-      const cells = bar.cells.map((cell) => cellHtml(cell, opts, hidden)).filter((html) => html !== '');
+      const hiding = barHiding(bar.indexInChart, opts.level);
+      const cells = bar.cells.map((cell) => cellHtml(cell, opts, hiding)).filter((html) => html !== '');
       parts.push(`<span class="measure">${cells.join(' ')}</span>`);
       for (const annotation of bar.annotations) {
         parts.push(`<span class="annotation">${escapeHtml(annotation.text)}</span>`);

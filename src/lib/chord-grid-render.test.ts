@@ -107,16 +107,36 @@ describe('renderGridText', () => {
   });
 
   it('hides every chord at the last level and none at the first', () => {
-    expect(text('C^7 |D-7 ', 'symbols', 'C', 4)).to.equal('| ----- | --- ||');
+    expect(text('C^7 |D-7 ', 'symbols', 'C', 5)).to.equal('| ----- | --- ||');
     expect(text('C^7 |D-7 ', 'symbols', 'C', 1)).to.equal('| Cmaj7 | Dm7 ||');
   });
 
-  it('hides the second and fourth bar of each group at the middle level', () => {
-    expect(text('C^7 |D-7 |E-7 |F^7 ', 'symbols', 'C', 2)).to.equal('| Cmaj7 | --- | Em7 | ----- ||');
+  it('hides only the qualities at the second level, keeping every root', () => {
+    // A reader still has the harmonic motion and has to recall whether a
+    // chord was a major seventh, a dominant or a half-diminished.
+    expect(text('C^7 |D-7 |G7 |F ', 'symbols', 'C', 2)).to.equal('| C---- | D-- | G- | F ||');
   });
 
-  it('keeps only the first bar of each group at level three', () => {
-    expect(text('C^7 |D-7 |E-7 |F^7 ', 'symbols', 'C', 3)).to.equal('| Cmaj7 | --- | --- | ----- ||');
+  it("hides a degree chord's quality the same way", () => {
+    expect(text('C^7 |D-7 ', 'numbers', 'C', 2)).to.equal('| 1---- | 2-- ||');
+  });
+
+  it('keeps a slash bass visible when only the quality is hidden', () => {
+    expect(text('C^7/G ', 'symbols', 'C', 2)).to.equal('| C----/G ||');
+  });
+
+  it('leaves a chord with no quality alone at the quality level', () => {
+    // A bare major triad has no quality to take away, so it is not given
+    // a dash that stands for nothing.
+    expect(text('C |D- ', 'symbols', 'C', 2)).to.equal('| C | D- ||');
+  });
+
+  it('hides the second and fourth bar of each group at the middle level', () => {
+    expect(text('C^7 |D-7 |E-7 |F^7 ', 'symbols', 'C', 3)).to.equal('| Cmaj7 | --- | Em7 | ----- ||');
+  });
+
+  it('keeps only the first bar of each group at the fourth level', () => {
+    expect(text('C^7 |D-7 |E-7 |F^7 ', 'symbols', 'C', 4)).to.equal('| Cmaj7 | --- | --- | ----- ||');
   });
 });
 
@@ -215,22 +235,22 @@ describe('renderGridHtml', () => {
   });
 
   it('blanks each chord of a hidden bar to its own width', () => {
-    expect(text('C^7 |D-7 A-7 ', 'symbols', 'C', 2)).to.equal('| Cmaj7 | --- --- ||');
+    expect(text('C^7 |D-7 A-7 ', 'symbols', 'C', 3)).to.equal('| Cmaj7 | --- --- ||');
   });
 
   it('restarts the four-bar grouping at the fifth bar', () => {
     // The fifth bar begins a new group, so it stays visible at level three
     // while the second, third and fourth do not.
-    const out = text('C^7 |D-7 |E-7 |F^7 |G7 |A-7 ', 'symbols', 'C', 3);
+    const out = text('C^7 |D-7 |E-7 |F^7 |G7 |A-7 ', 'symbols', 'C', 4);
     expect(out).to.equal('| Cmaj7 | --- | --- | ----- |\n| G7 | --- ||');
   });
 
   it('keeps a section letter visible at the level that hides every chord', () => {
-    expect(text('[*AC^7 |D-7 ', 'symbols', 'C', 4)).to.equal('[A] | ----- | --- ||');
+    expect(text('[*AC^7 |D-7 ', 'symbols', 'C', 5)).to.equal('[A] | ----- | --- ||');
   });
 
   it('blanks a chord in the HTML view as well', () => {
-    const out = html('C^7 ', 'symbols', 'C', 4);
+    const out = html('C^7 ', 'symbols', 'C', 5);
     expect(out).to.contain('-----');
     expect(out).to.not.contain('<sup>');
   });
@@ -238,10 +258,10 @@ describe('renderGridHtml', () => {
   it('prints the same number of dashes in both outputs for one chord', () => {
     // The two would otherwise disagree, since the glyph spelling is shorter
     // than the ASCII one.
-    const plain = text('C^7 ', 'symbols', 'C', 4).match(/-+/)?.[0] ?? '';
+    const plain = text('C^7 ', 'symbols', 'C', 5).match(/-+/)?.[0] ?? '';
     // Matched inside the chord element, since the markup's own class names
     // contain hyphens of their own.
-    const rendered = html('C^7 ', 'symbols', 'C', 4).match(/class="chord">(-+)</)?.[1] ?? '';
+    const rendered = html('C^7 ', 'symbols', 'C', 5).match(/class="chord">(-+)</)?.[1] ?? '';
     expect(plain.length).to.be.greaterThan(0);
     expect(rendered).to.equal(plain);
   });

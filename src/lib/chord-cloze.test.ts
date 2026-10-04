@@ -1,139 +1,57 @@
 import { describe, expect, it } from 'vitest';
-import { applyChordLevel, applyChordLevelToChordGrid } from './chord-cloze';
+import { barHiding, CHORD_LEVELS, type ChordLevel } from './chord-cloze';
 
-const ONE_CHORD_PER_BAR = [
-  'X:1',
-  'T:Test',
-  'K:C',
-  '"C"x4 | "F"x4 | "G"x4 | "Am"x4 | "Dm"x4 | "G7"x4 | "C"x4 | "C"x4 |',
-].join('\n');
+/**
+ * Tests for the level arithmetic alone. What a hidden bar actually looks
+ * like belongs to the renderer and is tested in chord-grid-render.test.ts.
+ */
+const eightBars = [0, 1, 2, 3, 4, 5, 6, 7];
 
-const TWO_CHORDS_PER_BAR = [
-  'X:1',
-  'T:Test',
-  'K:C',
-  '"Cm7"x4 "F7"x4 | "Bbmaj7"x4 "Ebmaj7"x4 | "Am7b5"x4 "D7"x4 | "Gm7"x4 "Gm7"x4 |',
-].join('\n');
+function pattern(level: ChordLevel): string {
+  return eightBars.map((i) => barHiding(i, level)[0]).join('');
+}
 
-describe('applyChordLevel', () => {
-  it('level 1 leaves the ABC text unchanged', () => {
-    expect(applyChordLevel(1, ONE_CHORD_PER_BAR)).toBe(ONE_CHORD_PER_BAR);
-    expect(applyChordLevel(1, TWO_CHORDS_PER_BAR)).toBe(TWO_CHORDS_PER_BAR);
+describe('barHiding', () => {
+  it('hides nothing at the first level', () => {
+    expect(pattern(1)).to.equal('nnnnnnnn');
   });
 
-  it('level 4 blanks every chord annotation to dashes of the same length', () => {
-    const result = applyChordLevel(4, ONE_CHORD_PER_BAR);
-    expect(result).toContain('"-"x4 | "-"x4 | "-"x4 | "--"x4 | "--"x4 | "--"x4 | "-"x4 | "-"x4 |');
-
-    const result2 = applyChordLevel(4, TWO_CHORDS_PER_BAR);
-    expect(result2).toContain('"---"');
-    expect(result2).not.toMatch(/"C|"F|"B|"E|"A|"D|"G/);
+  it('hides only the qualities at the second level, in every bar', () => {
+    expect(pattern(2)).to.equal('qqqqqqqq');
   });
 
-  it('level 2 blanks bars 2 and 4 of every 4-bar group (one chord per bar)', () => {
-    const result = applyChordLevel(2, ONE_CHORD_PER_BAR);
-    const bars = result
-      .split('\n')
-      .pop()!
-      .split('|')
-      .map((b) => b.trim())
-      .filter((b) => b !== '');
-    // bars: C(1) F(2) G(3) Am(4) Dm(5) G7(6) C(7) C(8)
-    expect(bars[0]).toContain('"C"');
-    expect(bars[1]).toContain('"-"');
-    expect(bars[2]).toContain('"G"');
-    expect(bars[3]).toContain('"--"');
-    expect(bars[4]).toContain('"Dm"');
-    expect(bars[5]).toContain('"--"');
-    expect(bars[6]).toContain('"C"');
-    expect(bars[7]).toContain('"-"');
+  it('hides every second bar at the third level', () => {
+    expect(pattern(3)).to.equal('nananana');
   });
 
-  it('level 2 blanks both chords in a hidden bar (two chords per bar)', () => {
-    const result = applyChordLevel(2, TWO_CHORDS_PER_BAR);
-    const bars = result
-      .split('\n')
-      .pop()!
-      .split('|')
-      .map((b) => b.trim())
-      .filter((b) => b !== '');
-    expect(bars[0]).toContain('"Cm7"');
-    expect(bars[0]).toContain('"F7"');
-    expect(bars[1]).toContain('"------"'); // "Bbmaj7" and "Ebmaj7" (6 chars each)
-    expect(bars[2]).toContain('"Am7b5"');
-    expect(bars[2]).toContain('"D7"');
-    expect(bars[3]).toContain('"---"'); // "Gm7" (3 chars)
+  it('keeps only the first bar of each group at the fourth level', () => {
+    expect(pattern(4)).to.equal('naaanaaa');
   });
 
-  it('level 3 keeps only the first bar of every 4-bar group', () => {
-    const result = applyChordLevel(3, ONE_CHORD_PER_BAR);
-    const bars = result
-      .split('\n')
-      .pop()!
-      .split('|')
-      .map((b) => b.trim())
-      .filter((b) => b !== '');
-    expect(bars[0]).toContain('"C"');
-    expect(bars[1]).toContain('"-"');
-    expect(bars[2]).toContain('"-"');
-    expect(bars[3]).toContain('"--"');
-    expect(bars[4]).toContain('"Dm"'); // first bar of the second group
-    expect(bars[5]).toContain('"--"');
-    expect(bars[6]).toContain('"-"');
-    expect(bars[7]).toContain('"-"');
+  it('hides every bar at the last level', () => {
+    expect(pattern(5)).to.equal('aaaaaaaa');
   });
 
-  it('level 3 with two chords per bar keeps both chords of the group-opening bar only', () => {
-    const result = applyChordLevel(3, TWO_CHORDS_PER_BAR);
-    const bars = result
-      .split('\n')
-      .pop()!
-      .split('|')
-      .map((b) => b.trim())
-      .filter((b) => b !== '');
-    expect(bars[0]).toContain('"Cm7"');
-    expect(bars[0]).toContain('"F7"');
-    expect(bars[1]).not.toMatch(/"(Bbmaj7|Ebmaj7)"/);
-    expect(bars[2]).not.toMatch(/"(Am7b5|D7)"/);
-    expect(bars[3]).not.toMatch(/"Gm7"/);
+  it('restarts the grouping at every fourth bar', () => {
+    // The fifth bar begins a new group, so it is visible again at the
+    // levels that group bars at all.
+    expect(barHiding(4, 3)).to.equal('none');
+    expect(barHiding(4, 4)).to.equal('none');
   });
 
-  it('leaves header lines (X:, T:, K:) untouched at every level', () => {
-    for (const level of [2, 3, 4] as const) {
-      const result = applyChordLevel(level, ONE_CHORD_PER_BAR);
-      expect(result).toContain('X:1');
-      expect(result).toContain('T:Test');
-      expect(result).toContain('K:C');
+  it('offers five levels, each at least as hidden as the one before it', () => {
+    expect(CHORD_LEVELS.length).to.equal(5);
+    const rank: Record<string, number> = { none: 0, quality: 1, all: 2 };
+    for (const index of eightBars) {
+      for (let i = 1; i < CHORD_LEVELS.length; i++) {
+        const previous = rank[barHiding(index, CHORD_LEVELS[i - 1])];
+        const current = rank[barHiding(index, CHORD_LEVELS[i])];
+        // Level 3 shows a bar that level 2 had taken the quality from, so
+        // the ordering holds over the chart rather than bar by bar; what
+        // must never happen is a level hiding nothing where an earlier one
+        // hid everything.
+        expect(previous === 2 && current === 0, `bar ${index}, level ${CHORD_LEVELS[i]}`).to.equal(false);
+      }
     }
-  });
-});
-
-describe('applyChordLevelToChordGrid', () => {
-  const PLAIN_GRID = 'C | F | G | Am | Dm | G7 | C | C |';
-
-  it('level 1 leaves the grid unchanged', () => {
-    expect(applyChordLevelToChordGrid(1, PLAIN_GRID)).toBe(PLAIN_GRID);
-  });
-
-  it('level 4 blanks every chord to dashes of the same length', () => {
-    expect(applyChordLevelToChordGrid(4, PLAIN_GRID)).toBe('- | - | - | -- | -- | -- | - | - |');
-  });
-
-  it('level 2 blanks bars 2 and 4 of every 4-bar group', () => {
-    expect(applyChordLevelToChordGrid(2, PLAIN_GRID)).toBe('C | - | G | -- | Dm | -- | C | - |');
-  });
-
-  it('level 3 keeps only the first bar of every 4-bar group', () => {
-    expect(applyChordLevelToChordGrid(3, PLAIN_GRID)).toBe('C | - | - | -- | Dm | -- | - | - |');
-  });
-
-  it('blanks multiple chords within one bar independently', () => {
-    const grid = 'Cm7 F7 | Bbmaj7 Ebmaj7 |';
-    expect(applyChordLevelToChordGrid(2, grid)).toBe('Cm7 F7 | ------ ------ |');
-  });
-
-  it("leaves a section-label field visible — the form isn't what's being memorized", () => {
-    const grid = '[P:A] C | F | G | Am |';
-    expect(applyChordLevelToChordGrid(4, grid)).toBe('[P:A] - | - | - | -- |');
   });
 });

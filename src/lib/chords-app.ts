@@ -30,7 +30,11 @@ function readUrl(): UrlState {
   const view = p.get('view') === 'chart' ? 'chart' : 'library';
   const id = p.get('id') ?? undefined;
   const rawLevel = parseInt(p.get('level') ?? '1', 10);
-  const level = (Number.isFinite(rawLevel) ? Math.max(1, Math.min(4, rawLevel)) : 1) as ChordLevel;
+  // Clamped against the number of levels there are rather than a literal,
+  // so that adding one cannot leave the URL unable to name it.
+  const level = (
+    Number.isFinite(rawLevel) ? Math.max(1, Math.min(CHORD_LEVELS.length, rawLevel)) : 1
+  ) as ChordLevel;
   const notation = readNotationMode(p.get('notation'));
   return { view, id, level, notation };
 }
@@ -234,6 +238,7 @@ function renderAtCurrentLevel(): void {
   if (!chartView) return;
   const { chart, level, notation } = chartView;
   $('chart-level-num').textContent = String(level);
+  $('chart-level-total').textContent = String(CHORD_LEVELS.length);
   document.querySelectorAll<HTMLButtonElement>('button[data-notation]').forEach((btn) => {
     btn.setAttribute('aria-pressed', String(btn.dataset.notation === notation));
   });
