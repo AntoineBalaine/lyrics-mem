@@ -255,7 +255,6 @@ function renderAtCurrentLevel(): void {
       err instanceof Error ? err.message : String(err),
     )}</p>`;
     currentChartText = '';
-    $('debug-chart-text').textContent = '';
     return;
   }
   const { layout, key, metadata } = prepared;
@@ -278,11 +277,6 @@ function renderAtCurrentLevel(): void {
   const nextBtn = $<HTMLButtonElement>('btn-level-next');
   prevBtn.disabled = level <= 1;
   nextBtn.disabled = level >= CHORD_LEVELS.length;
-
-  // The text the clipboard would receive, shown on the page so that the
-  // grid can be compared against what the chart says without opening
-  // devtools.
-  $('debug-chart-text').textContent = currentChartText;
 }
 
 async function renderChart(id: string, level: ChordLevel, notation: NotationMode): Promise<void> {
@@ -352,7 +346,7 @@ async function copyCurrentChart(): Promise<void> {
       // Fall through to the legacy path below.
     }
   }
-  showCopyStatus(legacyCopy(text) ? 'Copied!' : 'Copy failed — select the text below manually.');
+  showCopyStatus(legacyCopy(text) ? 'Copied!' : 'Copy failed — select the chart and copy it manually.');
 }
 
 function setNotationMode(notation: NotationMode): void {
