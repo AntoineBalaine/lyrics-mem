@@ -159,17 +159,41 @@ async function runImport(): Promise<void> {
   }
 }
 
+/**
+ * Reads a chosen file as text.
+ *
+ * Blob.text is used where it exists, and FileReader where it does not,
+ * because the mobile browsers that lack the first are exactly the ones a
+ * library backup gets imported from.
+ */
+async function readFileText(file: File): Promise<string> {
+  if (typeof file.text === 'function') return file.text();
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '');
+    reader.onerror = () => reject(reader.error ?? new Error('The file could not be read.'));
+    reader.readAsText(file);
+  });
+}
+
 // Imports every song found in an iRealPro "HTML backup" export (the
 // user's whole library, bundled as a handful of multi-song playlist
 // links) and adds each one to the chart library. Charts whose title and
 // composer already match an existing chart overwrite it (addChordChart's
 // id is derived from title+composer — see chord-key.ts's chordSlug),
 // rather than growing duplicates on a re-import of the same backup.
-async function runBackupImport(file: File): Promise<void> {
+async function runBackupImport(file: File, input?: HTMLInputElement): Promise<void> {
   const status = $('backup-import-status');
-  status.textContent = 'Reading backup file…';
+  status.textContent = `Reading ${file.name || 'backup file'}…`;
   try {
-    const html = await file.text();
+    const html = await readFileText(file);
+    // Reset only now that the file has been read, so that choosing the
+    // same file again still triggers a fresh import.
+    if (input) input.value = '';
+    if (html.trim() === '') {
+      status.textContent = `Could not read any text out of ${file.name || 'that file'}.`;
+      return;
+    }
     const { charts, errors } = importLibraryBackup(html);
     status.textContent = `Importing ${charts.length} chart${charts.length === 1 ? '' : 's'}…`;
     for (const chart of charts) {
@@ -182,7 +206,12 @@ async function runBackupImport(file: File): Promise<void> {
     }
     status.textContent = parts.join(' ');
   } catch (err) {
-    status.textContent = err instanceof Error ? err.message : String(err);
+    if (input) input.value = '';
+    // An error from a file read on a phone can carry an empty message, and
+    // reporting that leaves the page looking as though nothing happened,
+    // so the name of the condition stands in for it.
+    const message = err instanceof Error ? err.message || err.name : String(err);
+    status.textContent = `Could not read that file: ${message || 'unknown error'}.`;
   }
 }
 
@@ -384,8 +413,11 @@ function bind(): void {
   $<HTMLInputElement>('import-backup-file').addEventListener('change', (e) => {
     const input = e.target as HTMLInputElement;
     const file = input.files?.[0];
-    input.value = ''; // allow re-selecting the same file to re-import
-    if (file) void runBackupImport(file);
+    // The input is reset by runBackupImport once the file has been read,
+    // not here: clearing it while a read is still pending detaches the
+    // file the browser handed us, and on a phone that read then fails with
+    // an error carrying no message, which looks like nothing happening.
+    if (file) void runBackupImport(file, input);
   });
 
   $('btn-chart-back').addEventListener('click', () => navigate({ view: 'library' }));

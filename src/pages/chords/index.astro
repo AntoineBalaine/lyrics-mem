@@ -38,9 +38,21 @@
       <p id="import-status" class="status"></p>
 
       <div class="toolbar">
-        <label for="import-backup-file" class="file-input-label">
+        <!-- The input is nested in the label, so the label must not also
+             carry a "for" pointing at it: the two together activate the
+             picker twice, and on iOS the second activation discards the
+             first one's selection. The accept list stays broad because a
+             backup file reaches a phone through Files, Drive or Mail,
+             which hand it over as octet-stream or plain text as often as
+             text/html, and a file the filter greys out cannot be
+             chosen at all. -->
+        <label class="file-input-label">
           Import iRealPro backup (.html)
-          <input id="import-backup-file" type="file" accept=".html,text/html" />
+          <input
+            id="import-backup-file"
+            type="file"
+            accept=".html,.htm,text/html,text/plain,application/octet-stream"
+          />
         </label>
       </div>
       <p id="backup-import-status" class="status"></p>
