@@ -32,6 +32,19 @@ export type ChordLevel = 1 | 2 | 3 | 4;
 
 export const CHORD_LEVELS: readonly ChordLevel[] = [1, 2, 3, 4] as const;
 
+/**
+ * Whether a bar's chords are hidden at the given level.
+ *
+ * Takes the bar's position over the whole chart, which the layout records
+ * as it groups bars into lines, so that the groups of four this hides match
+ * the groups a reader sees. The string-rewriting functions below instead
+ * counted bars by splitting text on barline characters, which is the same
+ * arithmetic performed against a far weaker idea of where a bar begins.
+ */
+export function shouldHideBarAt(indexInChart: number, level: ChordLevel): boolean {
+  return shouldHideBar(indexInChart, level);
+}
+
 const GROUP_SIZE = 4;
 
 // Matches a quoted ABC annotation/chord-symbol, e.g. "Cmaj7" or "F#7b9".

@@ -9,7 +9,6 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width" />
     <title>chords-mem</title>
-    <script is:inline src="https://cdn.jsdelivr.net/npm/abcjs@6.5.2/dist/abcjs-basic-min.js"></script>
   </head>
   <body>
     <header>
@@ -87,7 +86,7 @@
       </nav>
       <div class="score-toolbar">
         <span id="copy-status" class="copy-status" aria-live="polite"></span>
-        <button id="btn-copy-abc" type="button" class="icon-button" title="Copy chord chart to clipboard" aria-label="Copy chord chart to clipboard">
+        <button id="btn-copy-chart" type="button" class="icon-button" title="Copy chord chart to clipboard" aria-label="Copy chord chart to clipboard">
           <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
             <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
@@ -97,12 +96,8 @@
       <div id="chart-score"></div>
 
       <details class="debug-output">
-        <summary>ABC text (current level, fed to abcjs)</summary>
-        <pre id="debug-abc-output"></pre>
-      </details>
-      <details class="debug-output">
-        <summary>ABCx text (converted from the iRealPro link at import time)</summary>
-        <pre id="debug-abcx-output"></pre>
+        <summary>Chart as plain text (what the copy button puts on the clipboard)</summary>
+        <pre id="debug-chart-text"></pre>
       </details>
     </section>
 
@@ -336,7 +331,10 @@
         font-family: ui-monospace, Menlo, Consolas, monospace;
         white-space: pre-wrap;
       }
-      .number-chart-line {
+      /* One element per line of the chart, never wrapping: a line holds the
+         bars a reader expects it to hold, and a narrow screen scrolls
+         sideways instead of breaking the grouping. */
+      .chart-line {
         display: flex;
         flex-wrap: nowrap;
         align-items: baseline;
@@ -344,9 +342,59 @@
         width: 100%;
         margin-bottom: 0.6rem;
       }
-      .number-chart-line .chord,
-      .number-chart-line .bar {
+      .chart-line > * {
         flex-shrink: 0;
+      }
+      /* Reserves the section letter's width on every line, so that the bars
+         of a section's continuation lines stay in the same columns as those
+         of the line its letter heads. */
+      .chart-line .heading {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+      }
+      /* Reserves the section letter's width only on a chart that has
+         letters, so that a section's continuation lines keep their bars in
+         the same columns as the line its letter heads, while a chart with
+         no letters at all is not indented for nothing. */
+      .chord-grid:has(.section-label) .chart-line .heading {
+        min-width: 1.9rem;
+      }
+      #chart-score .navigation {
+        font-size: 0.75rem;
+        font-weight: 700;
+        color: #1a1a1a;
+      }
+      #chart-score .error {
+        color: #b00;
+      }
+      #chart-score .time-signature {
+        color: #666;
+        font-size: 0.85rem;
+      }
+      #chart-score .ending {
+        color: #666;
+        font-size: 0.8rem;
+        margin-right: 0.2rem;
+      }
+      #chart-score .annotation {
+        color: #666;
+        font-size: 0.8rem;
+        font-style: italic;
+        margin-left: 0.3rem;
+      }
+      #chart-score .chart-annotation {
+        color: #666;
+        font-size: 0.85rem;
+        margin-bottom: 0.6rem;
+      }
+      #chart-score .chord-small {
+        font-size: 0.85em;
+      }
+      #chart-score .alternative {
+        color: #666;
+        font-size: 0.8em;
+        font-weight: 500;
       }
       #chart-score .chord {
         font-size: 1.3rem;

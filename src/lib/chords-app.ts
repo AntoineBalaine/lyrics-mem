@@ -5,26 +5,12 @@ import {
   listChordCharts,
   type ChordChartRecord,
 } from './chords-db';
-import { applyChordLevel, applyChordLevelToChordGrid, CHORD_LEVELS, type ChordLevel } from './chord-cloze';
-import { extractChordChartBody } from './chord-chart-text';
-import { renderNumberChartHtml } from './chord-number-chart';
-import { applyNotationModeToChordGrid, parseAbcKey, NOTATION_MODES, type NotationMode } from './chord-numbers';
+import { CHORD_LEVELS, type ChordLevel } from './chord-cloze';
+import { renderGridHtml, renderGridText } from './chord-grid-render';
+import { NOTATION_MODES, type NotationMode } from './chord-numbers';
 import { DEMO_CHARTS } from './chords-demo-seed';
-import { importIrealLink } from './ireal-import';
+import { importIrealLink, prepareChart } from './ireal-import';
 import { importLibraryBackup } from './ireal-backup-import';
-import { parseChartMeta } from './chart-meta';
-
-declare global {
-  interface Window {
-    ABCJS?: {
-      renderAbc: (
-        el: string | HTMLElement,
-        abc: string,
-        params?: Record<string, unknown>,
-      ) => unknown;
-    };
-  }
-}
 
 type View = 'library' | 'chart';
 
@@ -163,8 +149,8 @@ async function runImport(): Promise<void> {
   }
   status.textContent = 'Converting…';
   try {
-    const { title, composer, abc, abcx } = importIrealLink(link);
-    const saved = await addChordChart({ title, composer, abc, abcx });
+    const { title, composer, link: songLink } = importIrealLink(link);
+    const saved = await addChordChart({ title, composer, link: songLink });
     input.value = '';
     status.textContent = '';
     navigate({ view: 'chart', id: saved.id, level: 1 });
@@ -201,7 +187,7 @@ async function runBackupImport(file: File): Promise<void> {
 }
 
 // ─────────────────────────────────────────────────────────────
-// Chart view (level switcher, abcjs render)
+// Chart view (level switcher, text grid render)
 // ─────────────────────────────────────────────────────────────
 
 interface ChartViewState {
@@ -211,6 +197,10 @@ interface ChartViewState {
 }
 let chartView: ChartViewState | null = null;
 
+// The plain-text form of exactly what is on screen, kept so that the copy
+// action and the view can never disagree: both come from one render.
+let currentChartText = '';
+
 function renderAtCurrentLevel(): void {
   if (!chartView) return;
   const { chart, level, notation } = chartView;
@@ -219,59 +209,51 @@ function renderAtCurrentLevel(): void {
     btn.setAttribute('aria-pressed', String(btn.dataset.notation === notation));
   });
 
-  // The symbol view already shows title/tempo through abcjs's own header
-  // engraving; the Nashville/number views bypass abcjs entirely, so this
-  // line is the only place that metadata is visible there.
-  const meta = parseChartMeta(chart.abcx ?? chart.abc);
-  const metaParts = [`Key: ${meta.key}`];
-  if (meta.bpm) metaParts.push(`${meta.bpm} bpm`);
-  if (meta.style) metaParts.push(meta.style);
-  if (meta.groove) metaParts.push(meta.groove);
+  // The chart is scanned, parsed and laid out on every render rather than
+  // cached, since the chart's link is all that is stored and parsing one
+  // costs far less than a frame.
+  //
+  // A chart that cannot be read says so where the chart would be. Without
+  // this the thrown error escapes into a click handler and leaves the
+  // previous chart's grid on screen under the new chart's title, which
+  // reads as the wrong chart rather than as a failure.
+  let prepared: ReturnType<typeof prepareChart>;
+  try {
+    prepared = prepareChart(chart.link);
+  } catch (err) {
+    $('chart-meta').innerHTML = '';
+    $('chart-score').innerHTML = `<p class="error">${escapeHtml(
+      err instanceof Error ? err.message : String(err),
+    )}</p>`;
+    currentChartText = '';
+    $('debug-chart-text').textContent = '';
+    return;
+  }
+  const { layout, key, metadata } = prepared;
+
+  const metaParts = [`Key: ${metadata.key}`];
+  if (metadata.bpm) metaParts.push(`${metadata.bpm} bpm`);
+  if (metadata.style) metaParts.push(metadata.style);
+  if (metadata.groove) metaParts.push(metadata.groove);
   $('chart-meta').innerHTML = metaParts.map((p) => `<span>${escapeHtml(p)}</span>`).join('');
 
-  let debugText: string;
-  if (notation === 'symbols') {
-    // Real chord symbols still go through abcjs for actual staff
-    // notation — ABC is the right source for that, invisible-rest
-    // filler and all.
-    const abc = applyChordLevel(level, chart.abc);
-    debugText = abc;
-    if (window.ABCJS) {
-      window.ABCJS.renderAbc('chart-score', abc, {
-        responsive: 'resize',
-        staffwidth: 700,
-      });
-    } else {
-      // abcjs failed to load from the CDN (e.g. offline dev) — fall back to
-      // showing the raw ABC text so the level-hiding logic is still visible.
-      $('chart-score').innerHTML = `<pre>${escapeHtml(abc)}</pre>`;
-    }
-  } else {
-    // Nashville/number notation skips ABC (and staff rendering) entirely
-    // — there's no real pitch information to engrave, just a degree
-    // chart — and works from the chart's ABCx text instead, which is
-    // already a plain chord grid with no invisible-rest filler to leak
-    // through. Falls back to the ABC text for charts saved before the
-    // ABCx field existed.
-    const source = chart.abcx ?? chart.abc;
-    const key = parseAbcKey(source);
-    const grid = extractChordChartBody(source);
-    const converted = applyNotationModeToChordGrid(notation, key, grid);
-    const clozed = applyChordLevelToChordGrid(level, converted);
-    debugText = clozed;
-    $('chart-score').innerHTML = renderNumberChartHtml(clozed);
-  }
+  // All three notation modes draw the same grid through the same renderer,
+  // differing only in what each cell prints. They used to be two code
+  // paths, one of them through staff engraving, and drifted apart every
+  // time either was touched.
+  const options = { mode: notation, key, level };
+  $('chart-score').innerHTML = renderGridHtml(layout, options);
+  currentChartText = renderGridText(layout, options);
+
   const prevBtn = $<HTMLButtonElement>('btn-level-prev');
   const nextBtn = $<HTMLButtonElement>('btn-level-next');
   prevBtn.disabled = level <= 1;
   nextBtn.disabled = level >= CHORD_LEVELS.length;
 
-  // Debug output: the exact text fed to the renderer for this level
-  // (ABC for the symbol view, a plain chord grid for the number views),
-  // and the ABCx text the chart was originally converted from, so the
-  // conversion pipeline can be inspected without opening devtools.
-  $('debug-abc-output').textContent = debugText;
-  $('debug-abcx-output').textContent = chart.abcx ?? '(no ABCx saved for this chart — imported before this field existed)';
+  // The text the clipboard would receive, shown on the page so that the
+  // grid can be compared against what the chart says without opening
+  // devtools.
+  $('debug-chart-text').textContent = currentChartText;
 }
 
 async function renderChart(id: string, level: ChordLevel, notation: NotationMode): Promise<void> {
@@ -325,24 +307,23 @@ function legacyCopy(text: string): boolean {
   return ok;
 }
 
-// Copies just the chord-chart body (bar lines with chord annotations) —
-// not the X:/T:/C:/K: headers or source-link comment that precede it in
-// the raw ABC text — reflecting whatever's currently on screen (cloze
-// level and notation mode included).
-async function copyCurrentAbc(): Promise<void> {
-  const fullAbc = $('debug-abc-output').textContent ?? '';
-  const abc = extractChordChartBody(fullAbc);
-  if (!abc) return;
+// Copies the chord grid as it currently stands, cloze level and notation
+// mode included, in iReal Pro's own ASCII spelling rather than in the
+// unicode glyphs the page shows, since a chart pasted elsewhere is read by
+// tools that expect that convention.
+async function copyCurrentChart(): Promise<void> {
+  const text = currentChartText;
+  if (!text) return;
   if (navigator.clipboard?.writeText) {
     try {
-      await navigator.clipboard.writeText(abc);
+      await navigator.clipboard.writeText(text);
       showCopyStatus('Copied!');
       return;
     } catch {
       // Fall through to the legacy path below.
     }
   }
-  showCopyStatus(legacyCopy(abc) ? 'Copied!' : 'Copy failed — select the ABC text below manually.');
+  showCopyStatus(legacyCopy(text) ? 'Copied!' : 'Copy failed — select the text below manually.');
 }
 
 function setNotationMode(notation: NotationMode): void {
@@ -423,7 +404,7 @@ function bind(): void {
     });
   });
 
-  $('btn-copy-abc').addEventListener('click', () => void copyCurrentAbc());
+  $('btn-copy-chart').addEventListener('click', () => void copyCurrentChart());
 
   window.addEventListener('popstate', () => {
     void route();
