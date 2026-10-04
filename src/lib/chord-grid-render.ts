@@ -10,13 +10,13 @@
  * they drifted apart every time either was touched.
  *
  * Nothing here parses anything. A chord arrives as a ParsedChord and a
- * barline as a Barline, both from the layout in the parser package, and the
- * glyph tables below are keyed off those values rather than off text that
- * would have to be matched. That is the rule the whole rewrite rests on:
- * every defect it exists to remove came from a stage that was handed a
+ * barline as an IrealBarline, both from the layout in the parser package,
+ * and the glyph tables below are keyed off those values rather than off text
+ * that would have to be matched. That is the rule the whole rewrite rests
+ * on: every defect it exists to remove came from a stage that was handed a
  * string and had to recover structure from it.
  */
-import type { Barline, ChartLayout, LaidOutBar, LaidOutCell } from 'abcls-parser';
+import type { ChartLayout, IrealBarline, LaidOutBar, LaidOutCell } from 'abcls-parser';
 import { ChordQuality, type ParsedChord } from 'abcls-parser';
 import { KeyAccidental, type KeyRoot, type KeySignature } from 'abcls-parser/types/abcjs-ast';
 import { formatDegree, nashvilleDegree, regularDegree } from 'abcls-parser/music-theory/numberNotation';
@@ -40,7 +40,7 @@ function escapeHtml(s: string): string {
 // How a barline prints. The layout decides which one stands where, and in
 // particular gives the combined close-and-open its own value, so that this
 // never has to decide whether two adjacent barlines should have been one.
-const BARLINE_TEXT: Record<Barline, string> = {
+const BARLINE_TEXT: Record<IrealBarline, string> = {
   plain: '|',
   openRepeat: '|:',
   closeRepeat: ':|',
