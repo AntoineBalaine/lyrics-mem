@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { barHiding, CHORD_LEVELS, type ChordLevel } from './chord-cloze';
+import { barHiding, CHORD_LEVELS, type BarHiding, type ChordLevel } from './chord-cloze';
 
 /**
  * Tests for the level arithmetic alone. What a hidden bar actually looks
@@ -20,12 +20,12 @@ describe('barHiding', () => {
     expect(pattern(2)).to.equal('qqqqqqqq');
   });
 
-  it('hides every second bar at the third level', () => {
-    expect(pattern(3)).to.equal('nananana');
+  it('hides every second bar at the third level, qualities still gone', () => {
+    expect(pattern(3)).to.equal('qaqaqaqa');
   });
 
   it('keeps only the first bar of each group at the fourth level', () => {
-    expect(pattern(4)).to.equal('naaanaaa');
+    expect(pattern(4)).to.equal('qaaaqaaa');
   });
 
   it('hides every bar at the last level', () => {
@@ -35,22 +35,21 @@ describe('barHiding', () => {
   it('restarts the grouping at every fourth bar', () => {
     // The fifth bar begins a new group, so it is visible again at the
     // levels that group bars at all.
-    expect(barHiding(4, 3)).to.equal('none');
-    expect(barHiding(4, 4)).to.equal('none');
+    expect(barHiding(4, 3)).to.equal('quality');
+    expect(barHiding(4, 4)).to.equal('quality');
   });
 
-  it('offers five levels, each at least as hidden as the one before it', () => {
+  it('never hands back, bar by bar, anything an earlier level hid', () => {
+    // The levels are cumulative, so for every bar the amount hidden can
+    // only grow as the level rises. A level showing a quality that the one
+    // before it had taken away is the defect this pins.
     expect(CHORD_LEVELS.length).to.equal(5);
-    const rank: Record<string, number> = { none: 0, quality: 1, all: 2 };
+    const rank: Record<BarHiding, number> = { none: 0, quality: 1, all: 2 };
     for (const index of eightBars) {
       for (let i = 1; i < CHORD_LEVELS.length; i++) {
         const previous = rank[barHiding(index, CHORD_LEVELS[i - 1])];
         const current = rank[barHiding(index, CHORD_LEVELS[i])];
-        // Level 3 shows a bar that level 2 had taken the quality from, so
-        // the ordering holds over the chart rather than bar by bar; what
-        // must never happen is a level hiding nothing where an earlier one
-        // hid everything.
-        expect(previous === 2 && current === 0, `bar ${index}, level ${CHORD_LEVELS[i]}`).to.equal(false);
+        expect(current, `bar ${index}, level ${CHORD_LEVELS[i]}`).to.be.at.least(previous);
       }
     }
   });

@@ -132,11 +132,13 @@ describe('renderGridText', () => {
   });
 
   it('hides the second and fourth bar of each group at the middle level', () => {
-    expect(text('C^7 |D-7 |E-7 |F^7 ', 'symbols', 'C', 3)).to.equal('| Cmaj7 | --- | Em7 | ----- ||');
+    // The surviving bars keep their qualities hidden, since the level
+    // before this one took every quality away.
+    expect(text('C^7 |D-7 |E-7 |F^7 ', 'symbols', 'C', 3)).to.equal('| C---- | --- | E-- | ----- ||');
   });
 
   it('keeps only the first bar of each group at the fourth level', () => {
-    expect(text('C^7 |D-7 |E-7 |F^7 ', 'symbols', 'C', 4)).to.equal('| Cmaj7 | --- | --- | ----- ||');
+    expect(text('C^7 |D-7 |E-7 |F^7 ', 'symbols', 'C', 4)).to.equal('| C---- | --- | --- | ----- ||');
   });
 });
 
@@ -235,14 +237,14 @@ describe('renderGridHtml', () => {
   });
 
   it('blanks each chord of a hidden bar to its own width', () => {
-    expect(text('C^7 |D-7 A-7 ', 'symbols', 'C', 3)).to.equal('| Cmaj7 | --- --- ||');
+    expect(text('C^7 |D-7 A-7 ', 'symbols', 'C', 3)).to.equal('| C---- | --- --- ||');
   });
 
   it('restarts the four-bar grouping at the fifth bar', () => {
     // The fifth bar begins a new group, so it stays visible at level three
     // while the second, third and fourth do not.
     const out = text('C^7 |D-7 |E-7 |F^7 |G7 |A-7 ', 'symbols', 'C', 4);
-    expect(out).to.equal('| Cmaj7 | --- | --- | ----- |\n| G7 | --- ||');
+    expect(out).to.equal('| C---- | --- | --- | ----- |\n| G- | --- ||');
   });
 
   it('keeps a section letter visible at the level that hides every chord', () => {
