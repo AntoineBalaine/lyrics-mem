@@ -389,10 +389,28 @@ async function route(): Promise<void> {
 }
 
 function bind(): void {
-  $<HTMLInputElement>('library-search').addEventListener('input', (e) => {
-    librarySearch = (e.target as HTMLInputElement).value;
+  const search = $<HTMLInputElement>('library-search');
+  const clearSearch = $<HTMLButtonElement>('btn-clear-search');
+  // The button has nothing to clear while the field is empty, so it only
+  // appears once something has been typed.
+  const syncClearButton = (): void => {
+    clearSearch.hidden = search.value === '';
+  };
+  search.addEventListener('input', () => {
+    librarySearch = search.value;
+    syncClearButton();
     void renderLibrary();
   });
+  clearSearch.addEventListener('click', () => {
+    search.value = '';
+    librarySearch = '';
+    syncClearButton();
+    // Returns focus to the field, so that clearing a query and typing a
+    // new one does not need a second tap.
+    search.focus();
+    void renderLibrary();
+  });
+  syncClearButton();
   $<HTMLSelectElement>('library-sort').addEventListener('change', (e) => {
     librarySort = (e.target as HTMLSelectElement).value as LibrarySort;
     void renderLibrary();

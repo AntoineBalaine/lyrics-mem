@@ -31,9 +31,7 @@
       </div>
       <p class="hint">
         No link handy? Try a demo chart:
-        <button type="button" class="link" data-demo-index="0">Autumn Leaves</button>,
-        <button type="button" class="link" data-demo-index="1">Black Orpheus</button>, or
-        <button type="button" class="link" data-demo-index="2">All of Me</button>
+        <button type="button" class="link" data-demo-index="0">All of Me</button>
       </p>
       <p id="import-status" class="status"></p>
 
@@ -58,12 +56,32 @@
       <p id="backup-import-status" class="status"></p>
 
       <div class="toolbar">
-        <input
-          id="library-search"
-          type="text"
-          placeholder="Search charts by title or composer…"
-          autocomplete="off"
-        />
+        <!-- The clear button sits inside the field's own box rather than
+             beside it, so that it reads as part of the field and does not
+             take width from the field on a narrow screen. It is hidden
+             while the field is empty, since there is then nothing to
+             clear. -->
+        <div class="search-field">
+          <input
+            id="library-search"
+            type="text"
+            placeholder="Search charts by title or composer…"
+            autocomplete="off"
+          />
+          <button
+            id="btn-clear-search"
+            type="button"
+            class="clear-button"
+            title="Clear the search"
+            aria-label="Clear the search"
+            hidden
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
         <select id="library-sort" aria-label="Sort charts">
           <option value="recent">Recently added</option>
           <option value="title">Title (A-Z)</option>
@@ -169,6 +187,32 @@
         gap: 0.35rem;
         font-size: 0.85rem;
         color: #666;
+      }
+      .search-field {
+        position: relative;
+        display: flex;
+        flex: 1;
+        align-items: center;
+      }
+      .search-field input[type='text'] {
+        /* Room for the clear button, so a long query does not run under it. */
+        padding-right: 2.25rem;
+      }
+      .clear-button {
+        position: absolute;
+        right: 0.4rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.25rem;
+        border: none;
+        background: none;
+        color: #999;
+        cursor: pointer;
+        line-height: 0;
+      }
+      .clear-button:hover {
+        color: #1a1a1a;
       }
       input[type='text'] {
         flex: 1;
