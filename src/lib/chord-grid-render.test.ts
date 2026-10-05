@@ -385,6 +385,16 @@ describe('renderGridHtml', () => {
       ]);
     });
 
+    it('colours an augmented chord that names a seventh as a dominant', () => {
+      // iReal Pro writes this one `C7+`, and it is a dominant seventh over
+      // a raised fifth; the chord text spells it `C7#5`.
+      expect(family('C7+ ')).to.deep.equal(['quality-dominant']);
+    });
+
+    it('leaves an augmented triad with no seventh uncoloured', () => {
+      expect(family('C+ ')).to.deep.equal([]);
+    });
+
     it('leaves a suspended chord with no seventh uncoloured', () => {
       // Neither a third nor a seventh, so neither major nor dominant.
       expect(family('Csus |Csus2 ')).to.deep.equal([]);
@@ -398,7 +408,7 @@ describe('renderGridHtml', () => {
       // An augmented, a diminished, a power and an added chord. A
       // suspended chord used to be in this list, before a seventh on one
       // was recognised as making it a dominant.
-      expect(family('C+ |Co7 |C5 |Cadd9 ')).to.deep.equal([]);
+      expect(family('Co7 |C5 |Cadd9 |C-^7 ')).to.deep.equal([]);
     });
 
     it('colours an alternative chord for what it is, not for its neighbour', () => {

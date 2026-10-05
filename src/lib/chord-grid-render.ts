@@ -170,6 +170,9 @@ function qualityGlyphs(chord: ParsedChord): string {
  *   writes a dominant as the absence of a quality symbol. Musically it is
  *   a major triad, and so is `C6`, so both are green; red needs a seventh.
  * - `C7alt` is a dominant with its tensions left unsaid, so it is red.
+ * - `C7+`, which this writes as `C7#5`, is a dominant seventh over a
+ *   raised fifth, so it is red as well. An augmented triad naming no
+ *   seventh is not a dominant and takes no colour.
  * - `A7sus` is a dominant too. The suspension replaces the third rather
  *   than changing the function, and the seventh is still there. A sus
  *   chord naming no seventh, `Csus4`, has neither a third nor a seventh
@@ -194,6 +197,7 @@ function qualityClass(chord: ParsedChord): string | null {
       return 'quality-dominant';
     case ChordQuality.Suspended2:
     case ChordQuality.Suspended4:
+    case ChordQuality.Augmented:
       return namesASeventh(chord.extension) ? 'quality-dominant' : null;
     case ChordQuality.Minor:
       return 'quality-minor';
