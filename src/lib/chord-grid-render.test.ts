@@ -375,8 +375,30 @@ describe('renderGridHtml', () => {
       expect(family('C7alt ')).to.deep.equal(['quality-dominant']);
     });
 
+    it('colours a suspended chord that names a seventh as a dominant', () => {
+      // The suspension replaces the third; it does not change what the
+      // chord is doing, and the seventh is still there.
+      expect(family('A7sus |C9sus |G7sus2 ')).to.deep.equal([
+        'quality-dominant',
+        'quality-dominant',
+        'quality-dominant',
+      ]);
+    });
+
+    it('leaves a suspended chord with no seventh uncoloured', () => {
+      // Neither a third nor a seventh, so neither major nor dominant.
+      expect(family('Csus |Csus2 ')).to.deep.equal([]);
+    });
+
+    it('colours a sixth chord as major, since a sixth is not a seventh', () => {
+      expect(family('C6 |C^7 ')).to.deep.equal(['quality-major', 'quality-major']);
+    });
+
     it('leaves a quality it was not asked about uncoloured', () => {
-      expect(family('C+ |Co7 |C7sus |C5 ')).to.deep.equal([]);
+      // An augmented, a diminished, a power and an added chord. A
+      // suspended chord used to be in this list, before a seventh on one
+      // was recognised as making it a dominant.
+      expect(family('C+ |Co7 |C5 |Cadd9 ')).to.deep.equal([]);
     });
 
     it('colours an alternative chord for what it is, not for its neighbour', () => {
@@ -390,7 +412,7 @@ describe('renderGridHtml', () => {
 
     it('takes no colour from a chord the level has hidden', () => {
       // Colouring dashes would hand back the quality the level removed.
-      expect(family('C^7 |D-7 ', 'symbols')).to.not.deep.equal([]);
+      expect(family('C^7 |D-7 ')).to.not.deep.equal([]);
       expect([...html('C^7 |D-7 ', 'symbols', 'C', 5).matchAll(/class="quality-/g)]).to.deep.equal([]);
     });
   });

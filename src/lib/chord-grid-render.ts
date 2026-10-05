@@ -159,26 +159,42 @@ function qualityGlyphs(chord: ParsedChord): string {
  * that gets no colour of its own.
  *
  * Four colours, for the families the request named. An augmented,
- * diminished, suspended, power or added chord stays in the body text's own
- * colour rather than being given a meaning by implication.
+ * diminished, power or added chord stays in the body text's own colour
+ * rather than being given a meaning by implication.
  *
- * Three readings need care. A bare `C` parses as a dominant with no
- * extension, because the dialect writes a dominant as the absence of a
- * quality symbol, and musically it is a major triad, so it is coloured as
- * one: red is for a dominant that actually names a seventh or above. An
- * altered chord, `C7alt`, is a dominant with its tensions left unsaid, so
- * it takes the dominant's colour too. And the half-diminished test is the
- * same predicate the glyph uses, so that `Ch7` and `C-7b5`, which the
- * parser reads as two different qualities, come out the same colour as
- * well as the same symbol.
+ * What counts as a dominant is a question about function rather than about
+ * the quality symbol a chart happens to write, and it is where this keeps
+ * needing care:
+ *
+ * - A bare `C` parses as a dominant with no extension, because the dialect
+ *   writes a dominant as the absence of a quality symbol. Musically it is
+ *   a major triad, and so is `C6`, so both are green; red needs a seventh.
+ * - `C7alt` is a dominant with its tensions left unsaid, so it is red.
+ * - `A7sus` is a dominant too. The suspension replaces the third rather
+ *   than changing the function, and the seventh is still there. A sus
+ *   chord naming no seventh, `Csus4`, has neither a third nor a seventh
+ *   and takes no colour.
+ *
+ * The half-diminished test is the same predicate the glyph uses, so that
+ * `Ch7` and `C-7b5`, which the parser reads as two different qualities,
+ * come out the same colour as well as the same symbol.
  */
+function namesASeventh(extension: number | null): boolean {
+  // A seventh, ninth, eleventh and thirteenth all stack on a seventh. A
+  // sixth does not: `C6` is a major chord with a sixth in it.
+  return extension !== null && extension >= 7;
+}
+
 function qualityClass(chord: ParsedChord): string | null {
   if (isHalfDiminished(chord)) return 'quality-half-diminished';
   switch (chord.quality) {
     case ChordQuality.Dominant:
-      return chord.extension === null ? 'quality-major' : 'quality-dominant';
+      return namesASeventh(chord.extension) ? 'quality-dominant' : 'quality-major';
     case ChordQuality.Altered:
       return 'quality-dominant';
+    case ChordQuality.Suspended2:
+    case ChordQuality.Suspended4:
+      return namesASeventh(chord.extension) ? 'quality-dominant' : null;
     case ChordQuality.Minor:
       return 'quality-minor';
     case ChordQuality.Major:
