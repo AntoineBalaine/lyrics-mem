@@ -53,11 +53,12 @@ the machine. A chord chart stores the iRealPro link it came from and
 nothing derived from it, so improving the parser improves every chart
 already saved rather than only newly imported ones.
 
-Chord persistence can be switched off from the library page, or with
-`?persist=0`, which is useful while working on the parser: a reload then
-always starts from an empty library, so a chart converted by an older
-build cannot be mistaken for a fresh one. Charts already saved are left
-alone and reappear when it is switched back on.
+Chord persistence can be switched off with `?persist=0`, and back on with
+`?persist=1`. It is there for working on the parser: with it off a reload
+always starts from an empty library, so a chart read by an older build
+cannot be mistaken for a fresh one. The setting sticks until it is changed
+again, and charts already saved are left alone, reappearing when it is
+switched back on.
 
 ## Running it
 

@@ -6,7 +6,7 @@ import {
   listChordCharts,
   type ChordChartRecord,
 } from './chords-db';
-import { applyFlagsFromUrl, isPersistenceEnabled, setPersistenceEnabled } from './feature-flags';
+import { applyFlagsFromUrl } from './feature-flags';
 import { CHORD_LEVELS, type ChordLevel } from './chord-cloze';
 import { renderGridHtml, renderGridText } from './chord-grid-render';
 import { NOTATION_MODES, type NotationMode } from './chord-numbers';
@@ -415,15 +415,6 @@ function bind(): void {
   syncClearButton();
   $<HTMLSelectElement>('library-sort').addEventListener('change', (e) => {
     librarySort = (e.target as HTMLSelectElement).value as LibrarySort;
-    void renderLibrary();
-  });
-
-  const persist = $<HTMLInputElement>('flag-persist');
-  persist.checked = isPersistenceEnabled();
-  persist.addEventListener('change', () => {
-    setPersistenceEnabled(persist.checked);
-    // The library is re-read rather than migrated, so the charts on the
-    // other side of the switch are left as they are.
     void renderLibrary();
   });
 
