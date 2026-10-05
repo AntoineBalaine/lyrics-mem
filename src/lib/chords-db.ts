@@ -1,33 +1,29 @@
+import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 import { z } from 'zod';
 import { chordSlug } from './chord-key';
+import { isPersistenceEnabled } from './feature-flags';
 
-// Storage is temporarily unhooked from IndexedDB (was `idb`-backed) and
-// kept in a plain in-memory Map instead, cleared on every page reload.
-// While the iRealPro -> ABC conversion pipeline is still actively
-// changing, a persisted chart from an earlier conversion looked
-// indistinguishable from a fresh one, so every manual test required
-// deleting and re-importing to be sure of what was actually being
-// rendered. An in-memory store makes that impossible by construction: a
-// reload always starts empty, so there is never stale converted output
-// to accidentally look at. Swap back to the idb-backed version (see git
-// history for this file) once the conversion pipeline has settled down.
+/**
+ * The chart library, kept either in this browser or only in memory.
+ *
+ * Which one is a runtime flag rather than a build constant, because the two
+ * ways this app is used want opposite answers; `feature-flags.ts` says why.
+ * The flag is read on every call, so flipping it takes effect on the next
+ * render: turning it on shows the persisted library, turning it off shows
+ * the in-memory one, and the charts on the other side are left alone rather
+ * than migrated. Nothing is deleted either way.
+ *
+ * Chord charts live in their own database rather than beside the lyrics
+ * songs of `db.ts`. They are unrelated content, and sharing a schema would
+ * tie each one's versioning to the other's.
+ */
 
-// Kept in a separate IndexedDB object store from the lyrics `songs` store
-// (see src/lib/db.ts) — chord charts are a distinct, unrelated content
-// type, and keeping them in their own store avoids any coupling to the
-// lyrics schema/versioning.
-// A chart stores its own iRealPro link and nothing derived from it, so
-// that it is scanned, parsed and laid out afresh on every display. This
-// replaces an earlier decision to store converted ABC and never the link:
-// that decision had the conversion as the thing worth keeping, and with
-// the conversion gone the link is the only source of truth left. Storing
-// it means a parser fix improves every chart already in the library rather
-// than only newly imported ones.
-//
-// The link held here names one song, rebuilt from the fields read out of
-// whatever playlist link the chart was imported from, so that a chart
-// carries its own source rather than a reference into a playlist of
-// several hundred others.
+// A chart stores its own iRealPro link and nothing derived from it, so that
+// it is scanned, parsed and laid out afresh on every display. That way a
+// parser fix improves every chart already in the library rather than only
+// newly imported ones, and there is no converted output to go stale. The
+// link names one song, rebuilt from the fields read out of whatever
+// playlist link the chart was imported from.
 export const chordChartRecordSchema = z.object({
   id: z.string(),
   title: z.string(),
@@ -39,7 +35,33 @@ export const chordChartRecordSchema = z.object({
 
 export type ChordChartRecord = z.infer<typeof chordChartRecordSchema>;
 
-const charts = new Map<string, ChordChartRecord>();
+interface ChordsDB extends DBSchema {
+  charts: {
+    key: string;
+    value: ChordChartRecord;
+    indexes: { 'by-savedAt': number };
+  };
+}
+
+const DB_NAME = 'chords-mem';
+const DB_VERSION = 1;
+
+let dbPromise: Promise<IDBPDatabase<ChordsDB>> | null = null;
+
+function db(): Promise<IDBPDatabase<ChordsDB>> {
+  if (!dbPromise) {
+    dbPromise = openDB<ChordsDB>(DB_NAME, DB_VERSION, {
+      upgrade(connection) {
+        const store = connection.createObjectStore('charts', { keyPath: 'id' });
+        store.createIndex('by-savedAt', 'savedAt');
+      },
+    });
+  }
+  return dbPromise;
+}
+
+/** The library held for this page only, used when persistence is off. */
+const memory = new Map<string, ChordChartRecord>();
 
 export interface AddChordChartInput {
   title: string;
@@ -47,8 +69,10 @@ export interface AddChordChartInput {
   link: string;
 }
 
-export async function addChordChart(input: AddChordChartInput): Promise<ChordChartRecord> {
+function toRecord(input: AddChordChartInput): ChordChartRecord {
   const record: ChordChartRecord = {
+    // Two charts with the same title and composer are the same chart, so a
+    // re-import of a backup overwrites rather than growing duplicates.
     id: chordSlug(input.title, input.composer),
     title: input.title.trim(),
     composer: input.composer.trim(),
@@ -57,18 +81,67 @@ export async function addChordChart(input: AddChordChartInput): Promise<ChordCha
     source: 'irealpro',
   };
   chordChartRecordSchema.parse(record);
-  charts.set(record.id, record);
   return record;
 }
 
+export async function addChordChart(input: AddChordChartInput): Promise<ChordChartRecord> {
+  const record = toRecord(input);
+  if (!isPersistenceEnabled()) {
+    memory.set(record.id, record);
+    return record;
+  }
+  const connection = await db();
+  await connection.put('charts', record);
+  return record;
+}
+
+/**
+ * Adds many charts at once.
+ *
+ * A library backup holds several hundred, and writing each in its own
+ * transaction makes importing one visibly slow; a single transaction is
+ * one round trip instead of hundreds.
+ */
+export async function addChordCharts(inputs: AddChordChartInput[]): Promise<ChordChartRecord[]> {
+  const records = inputs.map(toRecord);
+  if (!isPersistenceEnabled()) {
+    for (const record of records) memory.set(record.id, record);
+    return records;
+  }
+  const connection = await db();
+  const tx = connection.transaction('charts', 'readwrite');
+  for (const record of records) void tx.store.put(record);
+  await tx.done;
+  return records;
+}
+
 export async function getChordChart(id: string): Promise<ChordChartRecord | undefined> {
-  return charts.get(id);
+  if (!isPersistenceEnabled()) return memory.get(id);
+  const connection = await db();
+  return connection.get('charts', id);
 }
 
 export async function listChordCharts(): Promise<ChordChartRecord[]> {
-  return [...charts.values()].sort((a, b) => a.savedAt - b.savedAt);
+  if (!isPersistenceEnabled()) return [...memory.values()].sort((a, b) => a.savedAt - b.savedAt);
+  const connection = await db();
+  return connection.getAllFromIndex('charts', 'by-savedAt');
 }
 
 export async function deleteChordChart(id: string): Promise<void> {
-  charts.delete(id);
+  if (!isPersistenceEnabled()) {
+    memory.delete(id);
+    return;
+  }
+  const connection = await db();
+  await connection.delete('charts', id);
+}
+
+/** Empties whichever library is in use, for a reader who wants to start over. */
+export async function clearChordCharts(): Promise<void> {
+  if (!isPersistenceEnabled()) {
+    memory.clear();
+    return;
+  }
+  const connection = await db();
+  await connection.clear('charts');
 }

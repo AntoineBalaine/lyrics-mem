@@ -55,6 +55,20 @@
       </div>
       <p id="backup-import-status" class="status"></p>
 
+      <p class="hint">
+        <label class="flag">
+          <input id="flag-persist" type="checkbox" />
+          Keep charts in this browser between reloads
+        </label>
+        <span class="flag-note">
+          Turn this off while working on the conversion pipeline, so a reload
+          always starts from an empty library. Charts already kept are left
+          alone, and reappear when it is turned back on. The
+          <code>?persist=0</code> and <code>?persist=1</code> parameters set
+          it too.
+        </span>
+      </p>
+
       <div class="toolbar">
         <!-- The clear button sits inside the field's own box rather than
              beside it, so that it reads as part of the field and does not
@@ -180,6 +194,17 @@
         border: 1px solid #ccc;
         border-radius: 4px;
         background: white;
+      }
+      .flag {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        cursor: pointer;
+      }
+      .flag-note {
+        display: block;
+        margin-top: 0.25rem;
+        color: #888;
       }
       .file-input-label {
         display: flex;

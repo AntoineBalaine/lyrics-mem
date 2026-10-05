@@ -1,10 +1,12 @@
 import {
   addChordChart,
+  addChordCharts,
   deleteChordChart,
   getChordChart,
   listChordCharts,
   type ChordChartRecord,
 } from './chords-db';
+import { applyFlagsFromUrl, isPersistenceEnabled, setPersistenceEnabled } from './feature-flags';
 import { CHORD_LEVELS, type ChordLevel } from './chord-cloze';
 import { renderGridHtml, renderGridText } from './chord-grid-render';
 import { NOTATION_MODES, type NotationMode } from './chord-numbers';
@@ -200,9 +202,9 @@ async function runBackupImport(file: File, input?: HTMLInputElement): Promise<vo
     }
     const { charts, errors } = importLibraryBackup(html);
     status.textContent = `Importing ${charts.length} chart${charts.length === 1 ? '' : 's'}…`;
-    for (const chart of charts) {
-      await addChordChart(chart);
-    }
+    // One write rather than several hundred: a backup holds the whole
+    // library, and a transaction apiece made importing one visibly slow.
+    await addChordCharts(charts);
     await renderLibrary();
     const parts = [`Imported ${charts.length} chart${charts.length === 1 ? '' : 's'}.`];
     if (errors.length > 0) {
@@ -416,6 +418,15 @@ function bind(): void {
     void renderLibrary();
   });
 
+  const persist = $<HTMLInputElement>('flag-persist');
+  persist.checked = isPersistenceEnabled();
+  persist.addEventListener('change', () => {
+    setPersistenceEnabled(persist.checked);
+    // The library is re-read rather than migrated, so the charts on the
+    // other side of the switch are left as they are.
+    void renderLibrary();
+  });
+
   $('btn-import').addEventListener('click', () => void runImport());
   $<HTMLInputElement>('import-url').addEventListener('keydown', (e) => {
     if ((e as KeyboardEvent).key === 'Enter') void runImport();
@@ -461,6 +472,9 @@ function bind(): void {
 }
 
 export async function boot(): Promise<void> {
+  // Read before anything consults the flag, so that a persist parameter in
+  // the address bar applies to this page's first render.
+  applyFlagsFromUrl();
   bind();
   await route();
 }
