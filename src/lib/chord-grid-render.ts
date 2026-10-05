@@ -507,23 +507,27 @@ function textWidthInCharacters(cell: LaidOutCell, opts: RenderOptions): number {
 
 /**
  * The largest font size at which a cell's text fits the width it is given,
- * as a share of the line's width.
+ * in hundredths of the viewport's width.
  *
- * The cell's share of the line is its span of its bar, times the bar's
+ * The cell's share of the line is its span of its bar times the bar's
  * share of the line. Dividing that by how wide the text is in characters
- * gives the size each character may be, and `GLYPH` is how wide a
- * character is as a fraction of the font size for this typeface.
+ * gives what each character may be, where `GLYPH` is a character's width
+ * as a fraction of the font size in this typeface.
  *
- * This replaces a size taken from the line alone, which was useless: seven
- * per cent of a line is wider than the maximum size on any ordinary
- * screen, so the smaller of the two was always the maximum and nothing
- * ever shrank.
+ * Measured against the viewport rather than against the line, and the
+ * reason is worth recording: the obvious unit here is the container query
+ * one, which measures the line itself, and it did not take effect in the
+ * browser this is read on. Rather than keep guessing at why, this uses the
+ * unit that has worked everywhere for a decade. It is accurate because the
+ * chart is now the full width of the screen, so a line is the viewport
+ * less the gutter on each side, which `USABLE` accounts for.
  */
-function fitInLineWidths(cell: LaidOutCell, bar: LaidOutBar, barsInLine: number, opts: RenderOptions): number {
+function fitInViewportWidths(cell: LaidOutCell, bar: LaidOutBar, barsInLine: number, opts: RenderOptions): number {
   const GLYPH = 0.62;
+  const USABLE = 0.95;
   const span = Math.max(1, Math.min(bar.cellCount - cell.slot, spanOf(cell, bar)));
   const shareOfLine = (100 * span) / (bar.cellCount * Math.max(1, barsInLine));
-  return shareOfLine / (GLYPH * textWidthInCharacters(cell, opts));
+  return (shareOfLine * USABLE) / (GLYPH * textWidthInCharacters(cell, opts));
 }
 
 /**
@@ -600,9 +604,9 @@ export function renderGridHtml(layout: ChartLayout, opts: RenderOptions): string
         const html = cellHtml(cell, opts, hiding);
         if (html === '') continue;
         const span = Math.max(1, Math.min(bar.cellCount - cell.slot, spanOf(cell, bar)));
-        const fit = fitInLineWidths(cell, bar, line.bars.length, opts).toFixed(2);
+        const fit = fitInViewportWidths(cell, bar, line.bars.length, opts).toFixed(2);
         cells.push(
-          `<span class="cell" style="--cell-at:${cell.slot + 1};--cell-span:${span};--fit:${fit}cqw">${html}</span>`,
+          `<span class="cell" style="--cell-at:${cell.slot + 1};--cell-span:${span};--fit:${fit}vw">${html}</span>`,
         );
       }
 

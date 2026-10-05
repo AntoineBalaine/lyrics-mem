@@ -138,9 +138,12 @@ const base = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
 
     <style is:global>
       body {
+        /* The side padding is a variable so that anything needing the full
+           width can cancel it exactly rather than guess at it. */
+        --gutter: 0.5rem;
         max-width: 70ch;
         margin: 2rem auto;
-        padding: 0 1rem 5rem;
+        padding: 0 var(--gutter) 5rem;
         font-family:
           system-ui,
           -apple-system,
@@ -384,10 +387,19 @@ const base = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
         color: white;
         border-color: #1a1a1a;
       }
+      /* A chart is the one thing here that is not prose, so it takes the
+         whole screen rather than the reading column. It cancels the body's
+         gutter and its own share of the 70ch cap, which is what was
+         keeping a four-bar line narrower than the phone it was on. */
+      #view-chart {
+        width: 100vw;
+        margin-left: calc(50% - 50vw);
+        padding: 0 var(--gutter);
+        box-sizing: border-box;
+      }
       #chart-score {
         width: 100%;
         box-sizing: border-box;
-        overflow-x: auto;
       }
       #chart-score pre {
         font-family: ui-monospace, Menlo, Consolas, monospace;
@@ -408,7 +420,6 @@ const base = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
         column-gap: 0.15rem;
         width: 100%;
         margin-bottom: 0.6rem;
-        container-type: inline-size;
       }
       /* A section's letter and meter, on their own line above the chords. */
       .chart-heading {
@@ -466,10 +477,12 @@ const base = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
         white-space: nowrap;
         /* The renderer works out the largest size at which this cell's text
            fits the width the grid gives it, from the text's own length and
-           the cell's share of the line, and passes it as --fit. Sizing from
-           the line alone could not work: a fixed share of a line is wider
-           than the maximum on any ordinary screen, so the smaller of the two
-           was always the maximum and nothing ever shrank. */
+           the cell's share of the screen, and passes it as --fit in
+           viewport units. Two earlier attempts failed: a fixed share of the
+           line was wider than the maximum on any screen, so the smaller of
+           the two was always the maximum and nothing shrank; and the
+           container query unit, which is the right tool in principle, did
+           not take effect in the browser this is read on. */
         font-size: clamp(0.62rem, var(--fit, 1.3rem), 1.3rem);
       }
       #chart-score .navigation {
