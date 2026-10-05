@@ -158,29 +158,32 @@ function qualityGlyphs(chord: ParsedChord): string {
  * The colour family a chord belongs to, as a class name, or null for one
  * that gets no colour of its own.
  *
- * Four colours, for the families the request named. An augmented,
- * diminished, power or added chord stays in the body text's own colour
- * rather than being given a meaning by implication.
- *
- * What counts as a dominant is a question about function rather than about
- * the quality symbol a chart happens to write, and it is where this keeps
- * needing care:
+ * Four colours, each standing for what the chord is doing rather than for
+ * the quality symbol a chart happens to write. Every ruling below was made
+ * by the musician reading these charts, after a sweep of a real library
+ * listed what was going uncoloured:
  *
  * - A bare `C` parses as a dominant with no extension, because the dialect
  *   writes a dominant as the absence of a quality symbol. Musically it is
  *   a major triad, and so is `C6`, so both are green; red needs a seventh.
  * - `C7alt` is a dominant with its tensions left unsaid, so it is red.
  * - `C7+`, which this writes as `C7#5`, is a dominant seventh over a
- *   raised fifth, so it is red as well. An augmented triad naming no
- *   seventh is not a dominant and takes no colour.
- * - `A7sus` is a dominant too. The suspension replaces the third rather
- *   than changing the function, and the seventh is still there. A sus
- *   chord naming no seventh, `Csus4`, has neither a third nor a seventh
- *   and takes no colour.
+ *   raised fifth, and an augmented triad with no seventh is a major chord.
+ * - `A7sus` is a dominant: the suspension replaces the third without
+ *   changing the function, and the seventh is still there. A sus chord
+ *   naming no seventh is read as a minor chord.
+ * - A diminished seventh is a dominant.
+ * - A minor major seventh, and its ninth, are minor chords.
+ * - An added chord is a major chord, unless what it adds is a seventh.
+ *   Its extension is the note being added rather than a stack reaching
+ *   down to a seventh, which is why `Cadd9` is green where `C9` is red.
  *
  * The half-diminished test is the same predicate the glyph uses, so that
  * `Ch7` and `C-7b5`, which the parser reads as two different qualities,
  * come out the same colour as well as the same symbol.
+ *
+ * Two families are still deliberately uncoloured, having had no ruling: a
+ * bare diminished triad, and the diminished major seventh.
  */
 function namesASeventh(extension: number | null): boolean {
   // A seventh, ninth, eleventh and thirteenth all stack on a seventh. A
@@ -190,16 +193,27 @@ function namesASeventh(extension: number | null): boolean {
 
 function qualityClass(chord: ParsedChord): string | null {
   if (isHalfDiminished(chord)) return 'quality-half-diminished';
+  const seventh = namesASeventh(chord.extension);
   switch (chord.quality) {
     case ChordQuality.Dominant:
-      return namesASeventh(chord.extension) ? 'quality-dominant' : 'quality-major';
+      return seventh ? 'quality-dominant' : 'quality-major';
     case ChordQuality.Altered:
       return 'quality-dominant';
+    case ChordQuality.Augmented:
+      return seventh ? 'quality-dominant' : 'quality-major';
     case ChordQuality.Suspended2:
     case ChordQuality.Suspended4:
-    case ChordQuality.Augmented:
-      return namesASeventh(chord.extension) ? 'quality-dominant' : null;
+      return seventh ? 'quality-dominant' : 'quality-minor';
+    case ChordQuality.Diminished:
+      // Only a diminished seventh. A bare diminished triad has had no
+      // ruling and stays uncoloured.
+      return seventh ? 'quality-dominant' : null;
+    case ChordQuality.Add:
+      // The extension names the note being added rather than a stack, so
+      // `Cadd9` carries no seventh and is the major triad underneath it.
+      return chord.extension === 7 ? 'quality-dominant' : 'quality-major';
     case ChordQuality.Minor:
+    case ChordQuality.MinorMajor7:
       return 'quality-minor';
     case ChordQuality.Major:
       return 'quality-major';

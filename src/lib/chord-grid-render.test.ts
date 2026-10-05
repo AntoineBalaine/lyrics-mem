@@ -391,24 +391,36 @@ describe('renderGridHtml', () => {
       expect(family('C7+ ')).to.deep.equal(['quality-dominant']);
     });
 
-    it('leaves an augmented triad with no seventh uncoloured', () => {
-      expect(family('C+ ')).to.deep.equal([]);
+    it('reads a suspended chord with no seventh as a minor chord', () => {
+      expect(family('Csus |Csus2 ')).to.deep.equal(['quality-minor', 'quality-minor']);
     });
 
-    it('leaves a suspended chord with no seventh uncoloured', () => {
-      // Neither a third nor a seventh, so neither major nor dominant.
-      expect(family('Csus |Csus2 ')).to.deep.equal([]);
+    it('reads a diminished seventh as a dominant', () => {
+      expect(family('Co7 ')).to.deep.equal(['quality-dominant']);
+    });
+
+    it('reads a minor major seventh and its ninth as minor chords', () => {
+      expect(family('C-^7 |C-^9 ')).to.deep.equal(['quality-minor', 'quality-minor']);
+    });
+
+    it('reads an augmented triad as a major chord', () => {
+      expect(family('C+ ')).to.deep.equal(['quality-major']);
+    });
+
+    it('reads an added chord as major, since what it adds is not a seventh', () => {
+      // The extension names the note being added rather than a stack, so
+      // `Cadd9` carries no seventh where `C9` does.
+      expect(family('Cadd9 |C9 ')).to.deep.equal(['quality-major', 'quality-dominant']);
     });
 
     it('colours a sixth chord as major, since a sixth is not a seventh', () => {
       expect(family('C6 |C^7 ')).to.deep.equal(['quality-major', 'quality-major']);
     });
 
-    it('leaves a quality it was not asked about uncoloured', () => {
-      // An augmented, a diminished, a power and an added chord. A
-      // suspended chord used to be in this list, before a seventh on one
-      // was recognised as making it a dominant.
-      expect(family('Co7 |C5 |Cadd9 |C-^7 ')).to.deep.equal([]);
+    it('leaves the two families that have had no ruling uncoloured', () => {
+      // A bare diminished triad and a diminished major seventh. A power
+      // chord too, which names neither a third nor a seventh.
+      expect(family('Co |Co^7 |C5 ')).to.deep.equal([]);
     });
 
     it('colours an alternative chord for what it is, not for its neighbour', () => {
