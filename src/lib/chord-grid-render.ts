@@ -154,6 +154,36 @@ function qualityGlyphs(chord: ParsedChord): string {
   }
 }
 
+/**
+ * The colour family a chord belongs to, as a class name, or null for one
+ * that gets no colour of its own.
+ *
+ * Only the four families named by the request are coloured, so an
+ * augmented, suspended, power or added chord stays in the body text's own
+ * colour rather than being given a meaning by implication.
+ *
+ * Two readings need care. A bare `C` parses as a dominant with no
+ * extension, because the dialect writes a dominant as the absence of a
+ * quality symbol, and musically it is a major triad, so it is coloured as
+ * one: red is for a dominant that actually names a seventh or above. And
+ * the half-diminished test is the same predicate the glyph uses, so that
+ * `Ch7` and `C-7b5`, which the parser reads as two different qualities,
+ * come out the same colour as well as the same symbol.
+ */
+function qualityClass(chord: ParsedChord): string | null {
+  if (isHalfDiminished(chord)) return 'quality-half-diminished';
+  switch (chord.quality) {
+    case ChordQuality.Dominant:
+      return chord.extension === null ? 'quality-major' : 'quality-dominant';
+    case ChordQuality.Minor:
+      return 'quality-minor';
+    case ChordQuality.Major:
+      return 'quality-major';
+    default:
+      return null;
+  }
+}
+
 function alterationsText(chord: ParsedChord, glyphs: boolean): string {
   // A half-diminished glyph already carries the flattened fifth, so
   // printing the alteration again would read as a doubly flattened fifth.
@@ -399,7 +429,12 @@ function cellHtml(cell: LaidOutCell, opts: RenderOptions, hiding: BarHiding): st
     const width = hiding === 'quality' ? qualityHiddenWidth(chord, opts, true) : parts.quality.length;
     const text = hiding === 'quality' ? dashes(width) : parts.quality;
     const quality = width === 0 ? '' : `<sup>${escapeHtml(text)}</sup>`;
-    return `${escapeHtml(parts.root)}${quality}${escapeHtml(parts.bass)}`;
+    const written = `${escapeHtml(parts.root)}${quality}${escapeHtml(parts.bass)}`;
+    // The colour belongs to the chord rather than to the cell, so that an
+    // alternative chord is coloured for what it is instead of inheriting
+    // the colour of the chord it stands beside.
+    const family = qualityClass(chord);
+    return family === null ? written : `<span class="${family}">${written}</span>`;
   };
   const alternative = cell.alternative ? ` <span class="alternative">(${render(cell.alternative)})</span>` : '';
   const small = cell.small ? ' chord-small' : '';
@@ -416,18 +451,23 @@ function cellHtml(cell: LaidOutCell, opts: RenderOptions, hiding: BarHiding): st
  * The chart as HTML for the page.
  *
  * One line of the chart is one element, which is what lets a narrow screen
- * scroll sideways rather than wrap a line that a reader expects to hold
- * four bars.
+ * scroll sideways rather than wrap a line a reader expects to hold four
+ * bars. Two things deliberately sit outside that line so they cannot eat
+ * into its width: a section's heading, which goes on its own line above,
+ * and a bar's annotations, which stack under the bar they belong to.
  */
 export function renderGridHtml(layout: ChartLayout, opts: RenderOptions): string {
   const endingStarts = endingNumberStarts(layout);
-  const lines: string[] = [];
+  const blocks: string[] = [];
   let previousSection = -1;
   for (const line of layout.lines) {
-    const parts: string[] = [];
-    const heading: string[] = [];
     const firstOfSection = line.sectionIndex !== previousSection;
     previousSection = line.sectionIndex;
+
+    // The heading is its own line above the chords rather than a column
+    // beside them, which gives every bar of every line the full width to
+    // sit in and costs one short line per section instead.
+    const heading: string[] = [];
     for (const sign of lineNavigationSigns(layout, line.sectionIndex, firstOfSection)) {
       heading.push(`<span class="navigation">${escapeHtml(sign)}</span>`);
     }
@@ -439,8 +479,9 @@ export function renderGridHtml(layout: ChartLayout, opts: RenderOptions): string
         `<span class="time-signature">${line.timeSignature.numerator}/${line.timeSignature.denominator}</span>`,
       );
     }
-    parts.push(`<span class="heading">${heading.join('')}</span>`);
+    if (heading.length > 0) blocks.push(`<div class="chart-heading">${heading.join('')}</div>`);
 
+    const parts: string[] = [];
     for (const bar of line.bars) {
       parts.push(`<span class="bar">${escapeHtml(BARLINE_TEXT[bar.openBarline])}</span>`);
       if (bar.endingNumber !== undefined && endingStarts.has(bar.indexInChart)) {
@@ -448,18 +489,25 @@ export function renderGridHtml(layout: ChartLayout, opts: RenderOptions): string
       }
       const hiding = barHiding(bar.indexInChart, opts.level);
       const cells = bar.cells.map((cell) => cellHtml(cell, opts, hiding)).filter((html) => html !== '');
-      parts.push(`<span class="measure">${cells.join(' ')}</span>`);
+
+      // The bar is a column: its chords on the first row, anything written
+      // about the bar underneath them. An annotation beside the chords read
+      // as another chord and pushed the rest of the line sideways, which on
+      // a narrow screen is what forced the scrolling.
+      const below: string[] = [];
       for (const annotation of bar.annotations) {
-        parts.push(`<span class="annotation">${escapeHtml(annotation.text)}</span>`);
+        below.push(`<span class="annotation">${escapeHtml(annotation.text)}</span>`);
       }
-      if (bar.fermata) parts.push('<span class="fermata">⌢</span>');
+      if (bar.fermata) below.push('<span class="fermata">⌢</span>');
+      const under = below.length === 0 ? '' : `<span class="under">${below.join(' ')}</span>`;
+      parts.push(`<span class="bar-stack"><span class="measure">${cells.join(' ')}</span>${under}</span>`);
     }
     parts.push(`<span class="bar">${escapeHtml(BARLINE_TEXT[line.closeBarline])}</span>`);
-    lines.push(`<div class="chart-line">${parts.join('')}</div>`);
+    blocks.push(`<div class="chart-line">${parts.join('')}</div>`);
   }
 
   const annotations = layout.annotations
     .map((annotation) => `<div class="chart-annotation">${escapeHtml(annotation.text)}</div>`)
     .join('');
-  return `<div class="chord-grid">${annotations}${lines.join('')}</div>`;
+  return `<div class="chord-grid">${annotations}${blocks.join('')}</div>`;
 }

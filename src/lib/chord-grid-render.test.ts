@@ -309,4 +309,85 @@ describe('renderGridHtml', () => {
     expect(text('[*AC^7 ][*BQ D-7 ', 'symbols')).to.contain('[Coda]');
     expect(text('[*AC^7 ][*BS D-7 ', 'symbols')).to.contain('[S]');
   });
+  it('puts a section heading on its own line above the chords', () => {
+    // It used to be a column beside the chords, which cost every line that
+    // width; one short line per section costs less.
+    const out = html('[*AT44C^7 |D-7 ', 'symbols');
+    expect(out).to.contain('<div class="chart-heading">');
+    expect(out.indexOf('chart-heading')).to.be.lessThan(out.indexOf('chart-line'));
+    expect(out).to.not.contain('class="heading"');
+  });
+
+  it('writes no heading line for a line that heads nothing', () => {
+    const out = html('C^7 |D-7 |E-7 |F^7 |G7 ', 'symbols');
+    expect(out).to.not.contain('chart-heading');
+    expect(out.split('class="chart-line"').length - 1).to.equal(2);
+  });
+
+  it('stacks a bar annotation under that bar rather than beside it', () => {
+    // Beside the chords it read as another chord and pushed the rest of
+    // the line sideways.
+    const out = html('C^7 <Solos>|D-7 ', 'symbols');
+    expect(out).to.contain('<span class="bar-stack">');
+    expect(out).to.contain('<span class="under"><span class="annotation">Solos</span></span>');
+    // The annotation comes after the chords of its own bar, and before the
+    // barline that ends it.
+    const stack = out.slice(out.indexOf('bar-stack'), out.indexOf('class="bar"', out.indexOf('bar-stack')));
+    expect(stack.indexOf('measure')).to.be.lessThan(stack.indexOf('under'));
+  });
+
+  it('gives a bar with nothing written about it no second row', () => {
+    expect(html('C^7 |D-7 ', 'symbols')).to.not.contain('class="under"');
+  });
+
+  it('stacks a fermata under its bar too', () => {
+    expect(html('fC^7 |D-7 ', 'symbols')).to.contain('class="under"');
+  });
+
+  describe('colour by chord quality', () => {
+    const family = (grid: string): string[] =>
+      [...html(grid, 'symbols').matchAll(/class="(quality-[a-z-]+)"/g)].map((m) => m[1]);
+
+    it('colours a dominant, a minor, a major and a half-diminished', () => {
+      expect(family('C7 |D-7 |E^7 |Fh7 ')).to.deep.equal([
+        'quality-dominant',
+        'quality-minor',
+        'quality-major',
+        'quality-half-diminished',
+      ]);
+    });
+
+    it('colours a bare triad as major, not as a dominant', () => {
+      // The dialect writes a dominant as the absence of a quality symbol,
+      // so a bare `C` parses as a dominant with no extension; musically it
+      // is a major triad and red is for one that names a seventh.
+      expect(family('C ')).to.deep.equal(['quality-major']);
+    });
+
+    it('colours both spellings of a half-diminished chord the same', () => {
+      expect(family('Ch7 |C-7b5 ')).to.deep.equal([
+        'quality-half-diminished',
+        'quality-half-diminished',
+      ]);
+    });
+
+    it('leaves a quality it was not asked about uncoloured', () => {
+      expect(family('C+ |Co7 |C7sus |C5 ')).to.deep.equal([]);
+    });
+
+    it('colours an alternative chord for what it is, not for its neighbour', () => {
+      expect(family('C^7 (A-7)')).to.deep.equal(['quality-major', 'quality-minor']);
+    });
+
+    it('colours the degree views too, since the quality is the same chord', () => {
+      const degrees = [...html('C7 |D-7 ', 'numbers').matchAll(/class="(quality-[a-z-]+)"/g)].map((m) => m[1]);
+      expect(degrees).to.deep.equal(['quality-dominant', 'quality-minor']);
+    });
+
+    it('takes no colour from a chord the level has hidden', () => {
+      // Colouring dashes would hand back the quality the level removed.
+      expect(family('C^7 |D-7 ', 'symbols')).to.not.deep.equal([]);
+      expect([...html('C^7 |D-7 ', 'symbols', 'C', 5).matchAll(/class="quality-/g)]).to.deep.equal([]);
+    });
+  });
 });
