@@ -96,6 +96,9 @@ The code is under the GNU Lesser General Public License, version 3 or
 later. `COPYING.LESSER` holds that licence and `COPYING` holds the GNU
 General Public License it is built on; the LGPL needs both.
 
-The song lyrics under `src/content/songs/` are not covered by it and are
-not the repository owner's to license. They are other people's words,
-kept here only to feed the private build.
+The song lyrics the private build reads from `src/content/songs/` are not
+in this repository and are not covered by that licence. They are other
+people's words, so they are neither the owner's to publish nor to license;
+they live only on the machine that builds the private site, and
+`.gitignore` keeps them out. A clone will build the public site as it
+stands and the private one with an empty library.

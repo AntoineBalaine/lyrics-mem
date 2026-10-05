@@ -7,3 +7,8 @@ dist/
 .DS_Store
 coverage/
 dist-public/
+
+# Song lyrics, kept on this machine and not in the repository. They are
+# other people's words, so they are not the repository owner's to publish
+# or to license; the private build reads them from here at build time.
+src/content/songs/*.txt
