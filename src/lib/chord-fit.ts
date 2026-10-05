@@ -1,97 +1,103 @@
 /**
- * Sizes each chord symbol to the width its cell actually has.
+ * Chooses the height of the chord symbols of a chart, and keeps every bar
+ * inside its own width.
  *
- * Because CSS cannot measure text, the renderer only passes a first guess
- * for the size, worked out from a count of characters. That guess cannot
- * know the real width of a glyph, the width a barline takes or the gap
- * between bars, so on a phone it left chords spilling out of their cells.
- * Since the browser knows the true widths, we measure here instead: text
- * width is proportional to font size, so measuring a chord once at the
- * largest size tells us exactly what size makes it fit.
+ * Because a phone has far more height than width, the chords are sized from
+ * the height: one size for the whole chart, the largest at which the chart
+ * still fits its box, which is one screen tall. Width never makes a chord
+ * shorter. A bar whose chords are wider than the bar at that size is
+ * instead squeezed horizontally, so that its chords keep their full height
+ * and only become narrower.
+ *
+ * Because CSS cannot measure text, this is done in the browser. Text height
+ * is proportional to font size, so measuring the chart once at the largest
+ * size says how far it must shrink, and a pass or two more corrects what
+ * the section headings, which do not shrink, leave over.
  */
 
-/** The size a chord takes when it has room to spare, in rem. */
-export const MAX_CHORD_REM = 1.3;
+/** The size a chord takes when the chart is short enough to allow it, in rem. */
+export const MAX_CHORD_REM = 3.5;
 
 /** Because a floor would bring the overflow back, this one only stops a size from reaching zero. */
-export const MIN_CHORD_REM = 0.3;
+export const MIN_CHORD_REM = 0.2;
 
-/** A little air, in pixels, so that a chord never touches the next cell. */
-const CELL_PADDING_PX = 1;
+/** A little air, in pixels, so that a bar's last chord never touches the barline. */
+const BAR_PADDING_PX = 2;
 
-/** How many times a size is corrected after measuring what it produced. */
-const REFINEMENT_PASSES = 3;
-
-export interface Measured {
-  bar: HTMLElement;
-  cell: HTMLElement;
-  chord: HTMLElement;
-  available: number;
-  natural: number;
-  rems: number;
-}
+/** How many times the size is corrected after measuring what it produced. */
+const REFINEMENT_PASSES = 4;
 
 /**
- * Sets `--fit` on every cell under `root` so that its chord fits the cell.
- *
- * Because reading a width right after writing a style forces the browser to
- * lay the page out again, the writes and the reads are kept in separate
- * passes: one write to give every chord its largest size, one read of all of
- * them, then a write of the sizes that fit and a read to check them.
+ * Sets `--chord-size` on `root` from the height of the chart's box, then
+ * squeezes every bar that is too narrow for its chords.
  */
 export function fitChords(root: HTMLElement): void {
-  const cells = Array.from(root.querySelectorAll<HTMLElement>('.measure > .cell'));
-  for (const cell of cells) cell.style.setProperty('--fit', `${MAX_CHORD_REM}rem`);
+  const measures = Array.from(root.querySelectorAll<HTMLElement>('.measure'));
+  for (const measure of measures) unsqueeze(measure);
 
-  const measured: Measured[] = [];
-  for (const cell of cells) {
-    const chord = cell.querySelector<HTMLElement>('.chord');
-    // A hidden view has no width at all, and sizing against that would
-    // shrink every chord to the floor. The observer fits it once it shows.
-    if (!chord || cell.clientWidth === 0) continue;
-    measured.push({
-      bar: cell.parentElement ?? cell,
-      cell,
-      chord,
-      available: cell.clientWidth - CELL_PADDING_PX,
-      natural: naturalWidth(chord),
-      rems: MAX_CHORD_REM,
-    });
+  let rems = MAX_CHORD_REM;
+  root.style.setProperty('--chord-size', `${rems}rem`);
+  for (let pass = 0; pass < REFINEMENT_PASSES; pass++) {
+    const ratio = heightRatio(root);
+    if (ratio >= 1) break;
+    const next = Math.max(MIN_CHORD_REM, rems * ratio);
+    if (next === rems) break;
+    rems = next;
+    root.style.setProperty('--chord-size', `${rems.toFixed(3)}rem`);
   }
 
-  // Because text does not scale perfectly with its size, the first estimate
-  // can still be a pixel or two too wide. Measuring again after each write
-  // and shrinking by what is left over converges within a pass or two.
-  let pending = measured;
-  for (let pass = 0; pass < REFINEMENT_PASSES && pending.length > 0; pass++) {
-    for (const item of pending) {
-      item.rems = Math.min(MAX_CHORD_REM, Math.max(MIN_CHORD_REM, (item.rems * item.available) / item.natural));
-      item.cell.style.setProperty('--fit', `${item.rems.toFixed(3)}rem`);
-    }
-    for (const item of pending) item.natural = naturalWidth(item.chord);
-    pending = pending.filter((item) => item.natural > item.available && item.rems > MIN_CHORD_REM);
-  }
-
-  shareSizeWithinBars(measured);
+  for (const measure of measures) squeezeToFit(measure);
 }
 
 /**
- * Gives every chord of a bar the one size that the tightest of them needs.
+ * How much of the chart's content fits the height of its box, as a ratio.
  *
- * Because each chord was fitted to its own cell, a bar holding four chords
- * showed them at four sizes, the later ones smaller as the room ran out.
- * The size is a property of the bar, so the smallest size any chord in it
- * needs is the size they all take. A chord that would have fitted larger
- * then fits with room to spare, which costs nothing and reads as one bar.
+ * Because the box is at most one screen tall and hides what overflows it,
+ * a chart too long for one screen is taller inside than out, and the box's
+ * height over the content's height says how far it must shrink.
  */
-export function shareSizeWithinBars(measured: Measured[]): void {
-  const smallest = new Map<HTMLElement, number>();
-  for (const { bar, rems } of measured) {
-    smallest.set(bar, Math.min(rems, smallest.get(bar) ?? MAX_CHORD_REM));
-  }
-  for (const { bar, cell } of measured) {
-    cell.style.setProperty('--fit', `${(smallest.get(bar) ?? MAX_CHORD_REM).toFixed(3)}rem`);
-  }
+export function heightRatio(root: HTMLElement): number {
+  const grid = root.querySelector<HTMLElement>('.chord-grid');
+  if (grid === null || grid.clientHeight === 0) return 1;
+  return Math.min(1, grid.clientHeight / grid.scrollHeight);
+}
+
+/** Puts a bar back to its own width, before it is measured again. */
+export function unsqueeze(measure: HTMLElement): void {
+  measure.style.removeProperty('width');
+  measure.style.removeProperty('transform');
+}
+
+/**
+ * Narrows a bar's chords, without making them shorter, when they are wider
+ * than the bar.
+ *
+ * The bar is laid out at the width its chords need and then scaled along
+ * its width only, so that the chords keep their places relative to each
+ * other and their full height.
+ */
+export function squeezeToFit(measure: HTMLElement): void {
+  const available = measure.clientWidth;
+  if (available === 0) return;
+  const needed = neededWidth(measure);
+  if (needed <= available) return;
+  measure.style.width = `${needed}px`;
+  measure.style.transform = `scaleX(${(available / needed).toFixed(4)})`;
+}
+
+/**
+ * How wide a bar's chords are at the current size.
+ *
+ * Because the chords of a bar sit side by side, a bar needs the sum of its
+ * chords' widths and the gaps between them, whatever beats they fall on.
+ */
+export function neededWidth(measure: HTMLElement): number {
+  const chords = Array.from(measure.querySelectorAll<HTMLElement>('.chord'));
+  if (chords.length === 0) return 0;
+  const gap = parseFloat(getComputedStyle(measure).columnGap) || 0;
+  let needed = BAR_PADDING_PX + gap * (chords.length - 1);
+  for (const chord of chords) needed += naturalWidth(chord);
+  return needed;
 }
 
 /**
@@ -134,5 +140,9 @@ export function refitOnWidthChange(watch: FitWatch): void {
 export function keepChordsFitted(root: HTMLElement): FitWatch {
   const watch: FitWatch = { root, lastWidth: -1 };
   new ResizeObserver(() => refitOnWidthChange(watch)).observe(root);
+  // Because the chords' web font arrives after the first fit, and a font
+  // change resizes no element, the observer would never see it. The chords
+  // are therefore fitted again once every font has loaded.
+  void document.fonts.ready.then(() => fitChords(root));
   return watch;
 }

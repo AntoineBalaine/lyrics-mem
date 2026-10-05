@@ -16,7 +16,8 @@
  * on: every defect it exists to remove came from a stage that was handed a
  * string and had to recover structure from it.
  */
-import type { ChartLayout, IrealBarline, LaidOutBar, LaidOutCell } from 'abcls-parser';
+import type { ChartLayout, IrealBarline, LaidOutBar, LaidOutCell, LaidOutLine } from 'abcls-parser';
+import type { FlowedLayout, FlowedLine } from './chart-flow';
 import { ChordQuality, type ParsedChord } from 'abcls-parser';
 import { KeyAccidental, type KeyRoot, type KeySignature } from 'abcls-parser/types/abcjs-ast';
 import { formatDegree, nashvilleDegree, regularDegree } from 'abcls-parser/music-theory/numberNotation';
@@ -301,16 +302,21 @@ function cellWithoutChordText(cell: LaidOutCell, opts: RenderOptions, glyphs: bo
  * jumping to it: 162 charts in the library carry at least one of the
  * three.
  */
-function lineNavigationSigns(layout: ChartLayout, sectionIndex: number, isFirstLineOfSection: boolean): string[] {
+function lineNavigationSigns(layout: ChartLayout, line: LaidOutLine, isFirstLineOfSection: boolean): string[] {
   if (!isFirstLineOfSection) return [];
   const signs: string[] = [];
   const nav = layout.navigation;
-  if (nav.segnoSectionIndex === sectionIndex) signs.push('S');
-  if (nav.codaSectionIndex === sectionIndex) signs.push('Coda');
-  // A part marker names a place the chart's own text refers back to, and
-  // iReal Pro gives it no name beyond its position, so it is drawn as
-  // itself rather than given a meaning it does not have.
-  if (nav.partMarkerSections.includes(sectionIndex)) signs.push('U');
+  // A section the flow folded into the one before it still carries its own
+  // markers, so every section the line stands for is read.
+  const sectionIndexes = 'sectionIndexes' in line ? (line as FlowedLine).sectionIndexes : [line.sectionIndex];
+  for (const sectionIndex of sectionIndexes) {
+    if (nav.segnoSectionIndex === sectionIndex) signs.push('S');
+    if (nav.codaSectionIndex === sectionIndex) signs.push('Coda');
+    // A part marker names a place the chart's own text refers back to, and
+    // iReal Pro gives it no name beyond its position, so it is drawn as
+    // itself rather than given a meaning it does not have.
+    if (nav.partMarkerSections.includes(sectionIndex)) signs.push('U');
+  }
   return signs;
 }
 
@@ -427,15 +433,18 @@ export function renderGridText(layout: ChartLayout, opts: RenderOptions): string
     const parts: string[] = [];
     const firstOfSection = line.sectionIndex !== previousSection;
     previousSection = line.sectionIndex;
-    for (const sign of lineNavigationSigns(layout, line.sectionIndex, firstOfSection)) {
+    for (const sign of lineNavigationSigns(layout, line, firstOfSection)) {
       parts.push(`[${sign}]`);
     }
     if (line.sectionLabel !== undefined) parts.push(`[${line.sectionLabel}]`);
     if (line.timeSignature !== undefined) {
       parts.push(`(${line.timeSignature.numerator}/${line.timeSignature.denominator})`);
     }
-    for (const bar of line.bars) {
+    const meterChanges = 'meterChanges' in line ? (line as FlowedLine).meterChanges : [];
+    for (const [position, bar] of line.bars.entries()) {
       parts.push(BARLINE_TEXT[bar.openBarline]);
+      const meter = meterChanges.find((change) => change.position === position)?.timeSignature;
+      if (meter !== undefined) parts.push(`(${meter.numerator}/${meter.denominator})`);
       if (bar.endingNumber !== undefined && endingStarts.has(bar.indexInChart)) {
         parts.push(`${bar.endingNumber}.`);
       }
@@ -486,51 +495,6 @@ function cellHtml(cell: LaidOutCell, opts: RenderOptions, hiding: BarHiding): st
 }
 
 /**
- * Roughly how many full-size characters wide a cell's text is.
- *
- * The quality sits in a superscript at about two thirds of the size, so it
- * counts for less than the root does. This is an estimate, because CSS
- * cannot measure text and the alternative is measuring in the browser with
- * script; it only has to be close enough to choose a size that fits.
- */
-function textWidthInCharacters(cell: LaidOutCell, opts: RenderOptions): number {
-  const SUPERSCRIPT = 0.65;
-  if (!cell.chord) return Math.max(1, cellWithoutChordText(cell, opts, true).length);
-  const parts = chordParts(cell.chord, opts, true);
-  let width = parts.root.length + parts.quality.length * SUPERSCRIPT + parts.bass.length;
-  if (cell.alternative) {
-    const alt = chordParts(cell.alternative, opts, true);
-    width += 2 + alt.root.length + alt.quality.length * SUPERSCRIPT + alt.bass.length;
-  }
-  return Math.max(1, width);
-}
-
-/**
- * The largest font size at which a cell's text fits the width it is given,
- * in hundredths of the viewport's width.
- *
- * The cell's share of the line is its span of its bar times the bar's
- * share of the line. Dividing that by how wide the text is in characters
- * gives what each character may be, where `GLYPH` is a character's width
- * as a fraction of the font size in this typeface.
- *
- * Measured against the viewport rather than against the line, and the
- * reason is worth recording: the obvious unit here is the container query
- * one, which measures the line itself, and it did not take effect in the
- * browser this is read on. Rather than keep guessing at why, this uses the
- * unit that has worked everywhere for a decade. It is accurate because the
- * chart is now the full width of the screen, so a line is the viewport
- * less the gutter on each side, which `USABLE` accounts for.
- */
-function fitInViewportWidths(cell: LaidOutCell, bar: LaidOutBar, barsInLine: number, opts: RenderOptions): number {
-  const GLYPH = 0.62;
-  const USABLE = 0.95;
-  const span = Math.max(1, Math.min(bar.cellCount - cell.slot, spanOf(cell, bar)));
-  const shareOfLine = (100 * span) / (bar.cellCount * Math.max(1, barsInLine));
-  return (shareOfLine * USABLE) / (GLYPH * textWidthInCharacters(cell, opts));
-}
-
-/**
  * How many cells a chord holds, which is until the next chord starts.
  *
  * A chord sounds from its own cell until something replaces it, so one on
@@ -556,8 +520,13 @@ function spanOf(cell: LaidOutCell, bar: LaidOutBar): number {
  * into its width: a section's heading, which goes on its own line above,
  * and a bar's annotations, which stack under the bar they belong to.
  */
-export function renderGridHtml(layout: ChartLayout, opts: RenderOptions): string {
+export function renderGridHtml(layout: ChartLayout | FlowedLayout, opts: RenderOptions): string {
   const endingStarts = endingNumberStarts(layout);
+  // Every line has the same number of bar slots, which is what lets a bar
+  // keep one width wherever it falls and a second ending sit under the
+  // first. A layout that was not flowed has no such number, so the longest
+  // of its lines stands in for it.
+  const slots = 'barsPerLine' in layout ? layout.barsPerLine : Math.max(1, ...layout.lines.map((l) => l.bars.length));
   const blocks: string[] = [];
   let previousSection = -1;
   for (const line of layout.lines) {
@@ -568,7 +537,7 @@ export function renderGridHtml(layout: ChartLayout, opts: RenderOptions): string
     // beside them, which gives every bar of every line the full width to
     // sit in and costs one short line per section instead.
     const heading: string[] = [];
-    for (const sign of lineNavigationSigns(layout, line.sectionIndex, firstOfSection)) {
+    for (const sign of lineNavigationSigns(layout, line, firstOfSection)) {
       heading.push(`<span class="navigation">${escapeHtml(sign)}</span>`);
     }
     if (line.sectionLabel !== undefined) {
@@ -583,7 +552,17 @@ export function renderGridHtml(layout: ChartLayout, opts: RenderOptions): string
 
     const parts: string[] = [];
     let lineHasEnding = false;
-    for (const bar of line.bars) {
+    // A second ending begins under the first, so the slots before it are
+    // empty. They are drawn as a barline and a bar with nothing in them, to
+    // keep the alternation the grid is built on. The class is not `empty`,
+    // because the library's empty-state message already owns that name and
+    // its padding made each blank slot 64 pixels tall.
+    const offset = 'offset' in line ? (line as FlowedLine).offset : 0;
+    for (let empty = 0; empty < offset; empty++) {
+      parts.push('<span class="bar"></span><span class="bar-stack slot-blank"></span>');
+    }
+    const meterChanges = 'meterChanges' in line ? (line as FlowedLine).meterChanges : [];
+    for (const [position, bar] of line.bars.entries()) {
       parts.push(`<span class="bar">${escapeHtml(BARLINE_TEXT[bar.openBarline])}</span>`);
       // An ending's number goes inside the bar rather than beside it, so
       // that a line is strictly a barline, a bar, a barline, a bar. The
@@ -593,7 +572,12 @@ export function renderGridHtml(layout: ChartLayout, opts: RenderOptions): string
         bar.endingNumber !== undefined && endingStarts.has(bar.indexInChart)
           ? `<span class="ending">${bar.endingNumber}.</span>`
           : '';
-      if (ending !== '') lineHasEnding = true;
+      // A meter that changes partway along a line is written above the bar
+      // it begins at, in the same strip as an ending's number.
+      const meter = meterChanges.find((change) => change.position === position)?.timeSignature;
+      const meterHtml =
+        meter === undefined ? '' : `<span class="meter">${meter.numerator}/${meter.denominator}</span>`;
+      if (ending !== '' || meterHtml !== '') lineHasEnding = true;
       const hiding = barHiding(bar.indexInChart, opts.level);
 
       // Each chord is placed on the cell the chart wrote it on, so two
@@ -601,22 +585,19 @@ export function renderGridHtml(layout: ChartLayout, opts: RenderOptions): string
       // merely next to each other. iReal Pro writes a bar as a run of
       // cells and pads the empty ones; the parser now keeps those
       // positions instead of discarding the padding.
-      // The size is the bar's rather than each chord's: the smallest that
-      // any chord in the bar needs, so that every chord of a bar is drawn at
-      // one size instead of shrinking as the room runs out.
-      let barFit = Infinity;
-      for (const cell of bar.cells) {
-        if (cellHtml(cell, opts, hiding) === '') continue;
-        barFit = Math.min(barFit, fitInViewportWidths(cell, bar, line.bars.length, opts));
-      }
+      // A chord takes the width its text needs, and the room left in the bar
+      // is shared out in proportion to the beats each chord holds, so that a
+      // chord held for two beats sits further from the next than one held
+      // for one. Beats before the first chord become a blank of their own.
       const cells: string[] = [];
+      let first = true;
       for (const cell of bar.cells) {
         const html = cellHtml(cell, opts, hiding);
         if (html === '') continue;
+        if (first && cell.slot > 0) cells.push(`<span class="cell-gap" style="--cell-span:${cell.slot}"></span>`);
+        first = false;
         const span = Math.max(1, Math.min(bar.cellCount - cell.slot, spanOf(cell, bar)));
-        cells.push(
-          `<span class="cell" style="--cell-at:${cell.slot + 1};--cell-span:${span};--fit:${barFit.toFixed(2)}vw">${html}</span>`,
-        );
+        cells.push(`<span class="cell" style="--cell-span:${span}">${html}</span>`);
       }
 
       // The bar is a column: its chords on the first row, anything written
@@ -629,8 +610,8 @@ export function renderGridHtml(layout: ChartLayout, opts: RenderOptions): string
       }
       if (bar.fermata) below.push('<span class="fermata">⌢</span>');
       const under = below.length === 0 ? '' : `<span class="under">${below.join(' ')}</span>`;
-      const measure = `<span class="measure" style="--cells:${bar.cellCount}">${cells.join('')}</span>`;
-      parts.push(`<span class="bar-stack">${ending}${measure}${under}</span>`);
+      const measure = `<span class="measure">${cells.join('')}</span>`;
+      parts.push(`<span class="bar-stack">${ending}${meterHtml}${measure}${under}</span>`);
     }
     parts.push(`<span class="bar">${escapeHtml(BARLINE_TEXT[line.closeBarline])}</span>`);
     // The bar count drives the grid: a barline takes only the width it
@@ -640,7 +621,7 @@ export function renderGridHtml(layout: ChartLayout, opts: RenderOptions): string
     // from it, a line holding one reserves a strip above all its bars, so
     // that every bar's chords stay level with their neighbours.
     const lineClass = lineHasEnding ? 'chart-line has-ending' : 'chart-line';
-    blocks.push(`<div class="${lineClass}" style="--bars:${line.bars.length}">${parts.join('')}</div>`);
+    blocks.push(`<div class="${lineClass}" style="--slots:${slots}">${parts.join('')}</div>`);
   }
 
   const annotations = layout.annotations

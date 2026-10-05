@@ -13,6 +13,15 @@ const base = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width" />
     <title>chords-mem</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- Open Sans at its condensed width, which is the face iReal Pro
+         renderers draw chords in: a narrow face lets a bar hold its chords
+         at a readable size. -->
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Open+Sans:wdth,wght@75,600;75,700&display=swap"
+    />
   </head>
   <body>
     <header>
@@ -413,20 +422,60 @@ const base = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
          phone. The template reads as the leading barline, then a bar and
          its closing barline repeated once per bar, which is why an ending
          number sits inside its bar rather than between the two. */
+      /* Every line has the same number of bar slots and every slot is the
+         same width, which is what lets a second ending sit directly under
+         the first. A barline has a column of a fixed width rather than the
+         width of its own text, so that bars stacked on different lines stay
+         aligned however their barlines differ. */
+      /* A chart is at most one screen tall, so that the whole tune is
+         read without scrolling, and chord-fit.ts makes its chords as tall
+         as that height allows. The small viewport unit is used so that the
+         browser's toolbars never cover the last line. On a wider screen
+         the height is capped, because a whole monitor's height would make
+         the chords far larger than anyone reads them. */
+      /* A barline's column grows with the chords, so that a repeat sign,
+         which is drawn at the chords' size, stays in its own column rather
+         than running into the chord beside it. */
+      .chord-grid {
+        --barline: calc(0.4 * var(--chord-size, 1.3rem));
+        max-height: 100vh;
+        max-height: 100svh;
+        box-sizing: border-box;
+        overflow: hidden;
+      }
+      @media (min-width: 768px) {
+        .chord-grid {
+          max-height: min(100svh, 48rem);
+        }
+      }
+      /* On a phone every pixel of width goes to the bars, so the chart
+         cancels the gutter that the rest of the view keeps. */
+      @media (max-width: 767px) {
+        #chart-score {
+          width: auto;
+          margin-left: calc(-1 * var(--gutter));
+          margin-right: calc(-1 * var(--gutter));
+        }
+      }
       .chart-line {
         display: grid;
-        grid-template-columns: auto repeat(var(--bars, 4), minmax(0, 1fr) auto);
+        grid-template-columns: var(--barline) repeat(var(--slots, 4), minmax(0, 1fr) var(--barline));
         align-items: start;
-        column-gap: 0.15rem;
         width: 100%;
-        margin-bottom: 0.6rem;
+        margin-bottom: 0.1rem;
       }
-      /* A section's letter and meter, on their own line above the chords. */
+      /* A section's letter and meter, on their own line above the chords.
+         Because the lines within a section sit close together, the space
+         that separates two sections is put above the heading instead. */
       .chart-heading {
         display: flex;
         align-items: center;
         gap: 0.3rem;
-        margin-bottom: 0.15rem;
+        margin-top: 0.6rem;
+        margin-bottom: 0.1rem;
+      }
+      .chord-grid > .chart-heading:first-child {
+        margin-top: 0;
       }
       /* A bar is a column: chords on the first row, whatever is written
          about the bar on a second row beneath them. */
@@ -449,32 +498,32 @@ const base = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
         white-space: normal;
         overflow-wrap: anywhere;
       }
-      /* The bar's own cells, so a chord sits where the chart put it: one
-         chord of a pair on the first cell of four starts at the bar's left
-         edge and holds half of it, and its partner on the third starts
-         halfway. */
+      /* A bar's chords sit side by side, each as wide as its own text, and
+         the room left over is shared out by how many beats each chord
+         holds. Every chord of the chart is the same size, `--chord-size`,
+         which chord-fit.ts sets to the largest at which the most crowded
+         bar still fits its width; so a chord never needs to shrink below
+         its own text, and the gap between chords is in em so that it
+         shrinks with them. */
+      /* A bar too narrow for its chords is laid out at their width and
+         squeezed back along its width by chord-fit.ts, from its left edge. */
       .measure {
-        display: grid;
-        grid-template-columns: repeat(var(--cells, 1), minmax(0, 1fr));
+        transform-origin: left center;
+        display: flex;
         align-items: baseline;
+        gap: 0.3em;
         min-width: 0;
+        font-size: var(--chord-size, 1.3rem);
       }
       .measure > .cell {
-        grid-column: var(--cell-at, auto) / span var(--cell-span, 1);
-        min-width: 0;
+        flex: var(--cell-span, 1) 0 auto;
       }
-      /* Text shrinks to fit its cell rather than widening it, which is what
-         iReal Pro does with a crowded bar; a cell that grew would stop the
-         bars being equal shares. The size is taken from the cell rather
-         than from the line, so a chord sharing a bar with another shrinks
-         further than one holding the bar alone, which is the whole point.
-         CSS cannot measure text, so this is proportional rather than exact:
-         the factor is set so that the longest chord names in a real
-         library, seven or eight characters, fit a quarter-line bar on a
-         narrow phone. */
+      .measure > .cell-gap {
+        flex: var(--cell-span, 1) 0 0;
+      }
 
       #chart-score .navigation {
-        font-size: 0.75rem;
+        font-size: 0.65rem;
         font-weight: 700;
         color: #1a1a1a;
       }
@@ -483,7 +532,7 @@ const base = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
       }
       #chart-score .time-signature {
         color: #666;
-        font-size: 0.85rem;
+        font-size: 0.65rem;
       }
       /* A repeat's number stands above its bar without taking a row from
          it. Because it was a row of the bar's own column, a bar with an
@@ -498,7 +547,8 @@ const base = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
       .chart-line.has-ending {
         padding-top: 1rem;
       }
-      #chart-score .ending {
+      #chart-score .ending,
+      #chart-score .meter {
         position: absolute;
         bottom: 100%;
         left: 0;
@@ -506,6 +556,13 @@ const base = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
         font-size: 0.8rem;
         line-height: 1.1;
         white-space: nowrap;
+      }
+      /* A meter that changes partway along a line sits to the right of any
+         ending number over the same bar, so that the two do not overlap. */
+      #chart-score .meter {
+        left: auto;
+        right: 0;
+        font-weight: 700;
       }
       #chart-score .annotation {
         color: #666;
@@ -538,54 +595,51 @@ const base = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
         font-size: 0.8em;
         font-weight: 500;
       }
-      /* The chord's size has to be declared here rather than on a selector
-         naming its cell, and that is the whole of why three attempts at
-         this did nothing: this rule carries an id, so it outranks any
-         selector built from classes however specific it looks, and a
-         `font-size: 1.3rem` sitting here quietly beat every clamp written
-         elsewhere. Changing the units was never going to help.
-         
-         The renderer works out the largest size at which this cell's text
-         fits the width the grid gives it, from the text's own length and the
-         cell's share of the screen, and passes it as --fit in viewport
-         units. That is only a first guess, because it cannot know the real
-         width of a glyph or of a barline, so src/lib/chord-fit.ts measures
-         each chord in the browser and replaces --fit with a size that fits.
-         The floor is low for that reason: a higher one would bring back the
-         overflow it was meant to prevent. */
+      /* The chord's size is declared on its bar, as `--chord-size`, and
+         the chord takes it as 1em; a cue-sized chord is a fraction of it.
+         Both rules carry the id, because an earlier rule here that did not
+         lost the cascade to one that did and quietly fixed every chord at
+         1.3rem. */
       #chart-score .chord {
         display: block;
         white-space: nowrap;
+        font-family: 'Open Sans', system-ui, sans-serif;
+        font-stretch: 75%;
         font-weight: 600;
-        --size: clamp(0.3rem, var(--fit, 1.3rem), 1.3rem);
-        font-size: var(--size);
+        font-size: 1em;
+        line-height: 1.15;
       }
-      /* A cue-sized chord is a fraction of whatever size its cell allows,
-         not a fixed size of its own. It has to come after the rule above
-         and carry the same id, or it loses the cascade to it the way that
-         rule used to beat the clamp. */
       #chart-score .chord-small {
-        font-size: calc(0.85 * var(--size));
+        font-size: 0.7em;
       }
       #chart-score .chord sup {
         font-size: 0.65em;
         font-weight: 500;
         margin-left: 0.05em;
       }
+      /* A barline is centred on its column and may be wider than it, as a
+         repeat sign is, in which case it spills into the bars beside it
+         rather than taking their width. */
       #chart-score .bar {
         color: #999;
-        margin: 0 0.3rem;
+        justify-self: center;
+        white-space: nowrap;
+        font-size: calc(0.8 * var(--chord-size, 1.3rem));
       }
+      /* A section's letter is a small mark above the chords, so that the
+         heading line takes less height and draws less attention than the
+         chords it introduces. */
       #chart-score .section-label {
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        width: 1.5rem;
-        height: 1.5rem;
-        margin-right: 0.4rem;
+        width: 0.95rem;
+        height: 0.95rem;
+        margin-right: 0.25rem;
         border: 1px solid #1a1a1a;
-        border-radius: 3px;
-        font-size: 0.9rem;
+        border-radius: 2px;
+        font-size: 0.65rem;
+        line-height: 1;
         font-weight: 700;
         flex-shrink: 0;
       }

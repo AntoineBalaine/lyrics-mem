@@ -13,6 +13,7 @@
  *
  * All of the work is client side, as the rest of this app is.
  */
+import { flowChart, type FlowedLayout } from './chart-flow';
 import {
   ABCContext,
   buildPlaylistLink,
@@ -23,7 +24,6 @@ import {
   scanGrid,
   stripChordDataMarker,
   unscramble,
-  type ChartLayout,
   type IrealSongFields,
 } from 'abcls-parser';
 import type { KeySignature } from 'abcls-parser/types/abcjs-ast';
@@ -44,7 +44,7 @@ export interface ChartMetadata {
 }
 
 export interface PreparedChart {
-  layout: ChartLayout;
+  layout: FlowedLayout;
   key: KeySignature;
   metadata: ChartMetadata;
 }
@@ -87,7 +87,7 @@ export function prepareChart(link: string): PreparedChart {
   const grid = unscramble(stripChordDataMarker(fields.rawChordData));
   const chart = parseGrid(scanGrid(grid, ctx), ctx);
   return {
-    layout: layoutChart(chart),
+    layout: flowChart(layoutChart(chart)),
     key: parseIrealKey(fields.key),
     metadata: {
       key: fields.key || 'C',
