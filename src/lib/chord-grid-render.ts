@@ -495,23 +495,6 @@ function cellHtml(cell: LaidOutCell, opts: RenderOptions, hiding: BarHiding): st
 }
 
 /**
- * How many cells a chord holds, which is until the next chord starts.
- *
- * A chord sounds from its own cell until something replaces it, so one on
- * the first cell of four with nothing after it holds the whole bar, and
- * one of a pair on cells one and three holds half. That is what lets a
- * chord be drawn across the time it occupies rather than as a label with
- * blank space beside it.
- */
-function spanOf(cell: LaidOutCell, bar: LaidOutBar): number {
-  let next = bar.cellCount;
-  for (const other of bar.cells) {
-    if (other.slot > cell.slot && other.slot < next) next = other.slot;
-  }
-  return next - cell.slot;
-}
-
-/**
  * The chart as HTML for the page.
  *
  * One line of the chart is one element, which is what lets a narrow screen
@@ -585,19 +568,16 @@ export function renderGridHtml(layout: ChartLayout | FlowedLayout, opts: RenderO
       // merely next to each other. iReal Pro writes a bar as a run of
       // cells and pads the empty ones; the parser now keeps those
       // positions instead of discarding the padding.
-      // A chord takes the width its text needs, and the room left in the bar
-      // is shared out in proportion to the beats each chord holds, so that a
-      // chord held for two beats sits further from the next than one held
-      // for one. Beats before the first chord become a blank of their own.
+      // The bar is a row of equal cells, one per cell the chart wrote, and
+      // each chord stands in the cell it was written on. An empty cell is
+      // therefore an empty cell's worth of space, so a chord held for two
+      // beats sits further from the next than one held for one, and every
+      // chord keeps the same size whatever its neighbours hold.
       const cells: string[] = [];
-      let first = true;
       for (const cell of bar.cells) {
         const html = cellHtml(cell, opts, hiding);
         if (html === '') continue;
-        if (first && cell.slot > 0) cells.push(`<span class="cell-gap" style="--cell-span:${cell.slot}"></span>`);
-        first = false;
-        const span = Math.max(1, Math.min(bar.cellCount - cell.slot, spanOf(cell, bar)));
-        cells.push(`<span class="cell" style="--cell-span:${span}">${html}</span>`);
+        cells.push(`<span class="cell" data-slot="${cell.slot}" style="--cell-at:${cell.slot + 1}">${html}</span>`);
       }
 
       // The bar is a column: its chords on the first row, anything written
@@ -610,7 +590,7 @@ export function renderGridHtml(layout: ChartLayout | FlowedLayout, opts: RenderO
       }
       if (bar.fermata) below.push('<span class="fermata">⌢</span>');
       const under = below.length === 0 ? '' : `<span class="under">${below.join(' ')}</span>`;
-      const measure = `<span class="measure">${cells.join('')}</span>`;
+      const measure = `<span class="measure" data-cells="${bar.cellCount}" style="--cells:${bar.cellCount}">${cells.join('')}</span>`;
       parts.push(`<span class="bar-stack">${ending}${meterHtml}${measure}${under}</span>`);
     }
     parts.push(`<span class="bar">${escapeHtml(BARLINE_TEXT[line.closeBarline])}</span>`);

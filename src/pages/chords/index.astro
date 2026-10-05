@@ -437,7 +437,7 @@ const base = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
          which is drawn at the chords' size, stays in its own column rather
          than running into the chord beside it. */
       .chord-grid {
-        --barline: calc(0.4 * var(--chord-size, 1.3rem));
+        --barline: calc(0.32 * var(--chord-size, 1.3rem));
         max-height: 100vh;
         max-height: 100svh;
         box-sizing: border-box;
@@ -498,28 +498,23 @@ const base = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
         white-space: normal;
         overflow-wrap: anywhere;
       }
-      /* A bar's chords sit side by side, each as wide as its own text, and
-         the room left over is shared out by how many beats each chord
-         holds. Every chord of the chart is the same size, `--chord-size`,
-         which chord-fit.ts sets to the largest at which the most crowded
-         bar still fits its width; so a chord never needs to shrink below
-         its own text, and the gap between chords is in em so that it
-         shrinks with them. */
-      /* A bar too narrow for its chords is laid out at their width and
-         squeezed back along its width by chord-fit.ts, from its left edge. */
+      /* A bar is a row of equal cells, one per cell the chart wrote, and a
+         chord stands in the cell it was written on and runs on into the
+         empty cells after it. Every chord of the chart is the same size,
+         `--chord-size`. A bar whose cells are too narrow for its chords is
+         laid out wider and squeezed back along its width by chord-fit.ts,
+         from its left edge, so that its chords keep their height. */
       .measure {
         transform-origin: left center;
-        display: flex;
+        display: grid;
+        grid-template-columns: repeat(var(--cells, 1), minmax(0, 1fr));
         align-items: baseline;
-        gap: 0.3em;
         min-width: 0;
         font-size: var(--chord-size, 1.3rem);
       }
       .measure > .cell {
-        flex: var(--cell-span, 1) 0 auto;
-      }
-      .measure > .cell-gap {
-        flex: var(--cell-span, 1) 0 0;
+        grid-column: var(--cell-at, auto) / span 1;
+        min-width: 0;
       }
 
       #chart-score .navigation {
@@ -609,8 +604,11 @@ const base = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
         font-size: 1em;
         line-height: 1.15;
       }
+      /* The chart's `s` marker asks for narrower chords, not shorter ones, so
+         a small chord keeps the full height and is only narrowed with its
+         bar when the bar is too crowded. */
       #chart-score .chord-small {
-        font-size: 0.7em;
+        font-size: 1em;
       }
       #chart-score .chord sup {
         font-size: 0.65em;

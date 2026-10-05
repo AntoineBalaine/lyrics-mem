@@ -24,6 +24,9 @@ export const MIN_CHORD_REM = 0.2;
 /** A little air, in pixels, so that a bar's last chord never touches the barline. */
 const BAR_PADDING_PX = 2;
 
+/** The space between two chords of a bar, in em of the chord size. */
+const CHORD_GAP_EM = 0.25;
+
 /** How many times the size is corrected after measuring what it produced. */
 const REFINEMENT_PASSES = 4;
 
@@ -86,18 +89,31 @@ export function squeezeToFit(measure: HTMLElement): void {
 }
 
 /**
- * How wide a bar's chords are at the current size.
+ * How wide a bar must be for each of its chords to fit before the next.
  *
- * Because the chords of a bar sit side by side, a bar needs the sum of its
- * chords' widths and the gaps between them, whatever beats they fall on.
+ * Because a bar is a row of equal cells and a chord stands in the cell it
+ * was written on, a chord has the cells up to the next chord to stand in,
+ * and the cell width the bar needs is the largest that any chord asks for.
+ * A chord followed by an empty cell asks for half as much per cell, which
+ * is what leaves an empty cell's worth of space after it once the bar is
+ * squeezed.
  */
 export function neededWidth(measure: HTMLElement): number {
-  const chords = Array.from(measure.querySelectorAll<HTMLElement>('.chord'));
-  if (chords.length === 0) return 0;
-  const gap = parseFloat(getComputedStyle(measure).columnGap) || 0;
-  let needed = BAR_PADDING_PX + gap * (chords.length - 1);
-  for (const chord of chords) needed += naturalWidth(chord);
-  return needed;
+  const cellCount = Number(measure.dataset.cells) || 1;
+  const cells = Array.from(measure.querySelectorAll<HTMLElement>('.cell'));
+  if (cells.length === 0) return 0;
+  const gap = CHORD_GAP_EM * (parseFloat(getComputedStyle(measure).fontSize) || 0);
+  let cellWidth = 0;
+  cells.forEach((cell, position) => {
+    const slot = Number(cell.dataset.slot) || 0;
+    const next = position + 1 < cells.length ? Number(cells[position + 1].dataset.slot) || cellCount : cellCount;
+    const chord = cell.querySelector<HTMLElement>('.chord');
+    if (chord === null) return;
+    const isLast = position + 1 === cells.length;
+    const width = naturalWidth(chord) + (isLast ? 0 : gap);
+    cellWidth = Math.max(cellWidth, width / Math.max(1, next - slot));
+  });
+  return BAR_PADDING_PX + cellWidth * cellCount;
 }
 
 /**
