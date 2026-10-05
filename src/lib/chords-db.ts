@@ -45,18 +45,59 @@ interface ChordsDB extends DBSchema {
 
 const DB_NAME = 'chords-mem';
 const DB_VERSION = 1;
+const STORE = 'charts';
 
 let dbPromise: Promise<IDBPDatabase<ChordsDB>> | null = null;
 
+function createStore(connection: IDBPDatabase<ChordsDB>): void {
+  if (connection.objectStoreNames.contains(STORE)) return;
+  const store = connection.createObjectStore(STORE, { keyPath: 'id' });
+  store.createIndex('by-savedAt', 'savedAt');
+}
+
+/**
+ * Opens the chart database, creating the store whatever state the origin
+ * is already in.
+ *
+ * An upgrade callback runs only when the version rises, so opening at a
+ * fixed version assumes this name is ours alone. It is not: a database of
+ * this name can already exist on the origin, left by anything else ever
+ * served from the same host and port, and then the store is simply absent
+ * and every read fails with "not a known object store name". That is what
+ * happened the first time a chart was saved. So the state is discovered
+ * rather than assumed: open, and if the store is missing, reopen one
+ * version higher to add it, which leaves whatever else the database holds
+ * untouched.
+ */
+async function openCharts(): Promise<IDBPDatabase<ChordsDB>> {
+  const onBlocking = (connection: IDBPDatabase<ChordsDB>) => () => {
+    // Another tab is upgrading. Letting go rather than holding it open is
+    // what keeps that tab from hanging.
+    connection.close();
+    dbPromise = null;
+  };
+
+  let connection = await openDB<ChordsDB>(DB_NAME, DB_VERSION, {
+    upgrade: createStore,
+    blocking() {
+      onBlocking(connection)();
+    },
+  });
+  if (connection.objectStoreNames.contains(STORE)) return connection;
+
+  const next = connection.version + 1;
+  connection.close();
+  connection = await openDB<ChordsDB>(DB_NAME, next, {
+    upgrade: createStore,
+    blocking() {
+      onBlocking(connection)();
+    },
+  });
+  return connection;
+}
+
 function db(): Promise<IDBPDatabase<ChordsDB>> {
-  if (!dbPromise) {
-    dbPromise = openDB<ChordsDB>(DB_NAME, DB_VERSION, {
-      upgrade(connection) {
-        const store = connection.createObjectStore('charts', { keyPath: 'id' });
-        store.createIndex('by-savedAt', 'savedAt');
-      },
-    });
-  }
+  if (!dbPromise) dbPromise = openCharts();
   return dbPromise;
 }
 
@@ -91,7 +132,7 @@ export async function addChordChart(input: AddChordChartInput): Promise<ChordCha
     return record;
   }
   const connection = await db();
-  await connection.put('charts', record);
+  await connection.put(STORE, record);
   return record;
 }
 
@@ -109,7 +150,7 @@ export async function addChordCharts(inputs: AddChordChartInput[]): Promise<Chor
     return records;
   }
   const connection = await db();
-  const tx = connection.transaction('charts', 'readwrite');
+  const tx = connection.transaction(STORE, 'readwrite');
   for (const record of records) void tx.store.put(record);
   await tx.done;
   return records;
@@ -118,13 +159,13 @@ export async function addChordCharts(inputs: AddChordChartInput[]): Promise<Chor
 export async function getChordChart(id: string): Promise<ChordChartRecord | undefined> {
   if (!isPersistenceEnabled()) return memory.get(id);
   const connection = await db();
-  return connection.get('charts', id);
+  return connection.get(STORE, id);
 }
 
 export async function listChordCharts(): Promise<ChordChartRecord[]> {
   if (!isPersistenceEnabled()) return [...memory.values()].sort((a, b) => a.savedAt - b.savedAt);
   const connection = await db();
-  return connection.getAllFromIndex('charts', 'by-savedAt');
+  return connection.getAllFromIndex(STORE, 'by-savedAt');
 }
 
 export async function deleteChordChart(id: string): Promise<void> {
@@ -133,7 +174,7 @@ export async function deleteChordChart(id: string): Promise<void> {
     return;
   }
   const connection = await db();
-  await connection.delete('charts', id);
+  await connection.delete(STORE, id);
 }
 
 /** Empties whichever library is in use, for a reader who wants to start over. */
@@ -143,5 +184,5 @@ export async function clearChordCharts(): Promise<void> {
     return;
   }
   const connection = await db();
-  await connection.clear('charts');
+  await connection.clear(STORE);
 }
