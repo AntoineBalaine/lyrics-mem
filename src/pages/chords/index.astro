@@ -472,19 +472,7 @@ const base = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
          the factor is set so that the longest chord names in a real
          library, seven or eight characters, fit a quarter-line bar on a
          narrow phone. */
-      .measure > .cell > .chord {
-        display: block;
-        white-space: nowrap;
-        /* The renderer works out the largest size at which this cell's text
-           fits the width the grid gives it, from the text's own length and
-           the cell's share of the screen, and passes it as --fit in
-           viewport units. Two earlier attempts failed: a fixed share of the
-           line was wider than the maximum on any screen, so the smaller of
-           the two was always the maximum and nothing shrank; and the
-           container query unit, which is the right tool in principle, did
-           not take effect in the browser this is read on. */
-        font-size: clamp(0.62rem, var(--fit, 1.3rem), 1.3rem);
-      }
+
       #chart-score .navigation {
         font-size: 0.75rem;
         font-weight: 700;
@@ -532,17 +520,37 @@ const base = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
         font-size: 0.85rem;
         margin-bottom: 0.6rem;
       }
-      #chart-score .chord-small {
-        font-size: 0.85em;
-      }
       #chart-score .alternative {
         color: #666;
         font-size: 0.8em;
         font-weight: 500;
       }
+      /* The chord's size has to be declared here rather than on a selector
+         naming its cell, and that is the whole of why three attempts at
+         this did nothing: this rule carries an id, so it outranks any
+         selector built from classes however specific it looks, and a
+         `font-size: 1.3rem` sitting here quietly beat every clamp written
+         elsewhere. Changing the units was never going to help.
+         
+         The renderer works out the largest size at which this cell's text
+         fits the width the grid gives it, from the text's own length and the
+         cell's share of the screen, and passes it as --fit in viewport
+         units. Those are accurate only because a chart is the full width of
+         the screen: if that ever stops being true, this needs the container
+         query unit instead, which measures the line itself. */
       #chart-score .chord {
-        font-size: 1.3rem;
+        display: block;
+        white-space: nowrap;
         font-weight: 600;
+        --size: clamp(0.62rem, var(--fit, 1.3rem), 1.3rem);
+        font-size: var(--size);
+      }
+      /* A cue-sized chord is a fraction of whatever size its cell allows,
+         not a fixed size of its own. It has to come after the rule above
+         and carry the same id, or it loses the cascade to it the way that
+         rule used to beat the clamp. */
+      #chart-score .chord-small {
+        font-size: calc(0.85 * var(--size));
       }
       #chart-score .chord sup {
         font-size: 0.65em;
