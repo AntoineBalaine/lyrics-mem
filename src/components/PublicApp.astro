@@ -1,8 +1,15 @@
 ---
 // Public-mode SPA shell. All actual content rendered client-side from IDB.
+
+// Trimmed of its trailing slash so the link below can add its own, which
+// is the convention src/pages/index.astro uses.
+const base = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
 ---
 
 <header>
+  <nav class="app-nav">
+    <a href={`${base}/chords/`}>chords-mem</a>
+  </nav>
   <h1>lyrics-mem</h1>
   <p class="tagline">A bionic-reading lyrics memorizer. Songs live in your browser only.</p>
 </header>
@@ -118,6 +125,13 @@
     font-size: 1.15rem;
     font-weight: 600;
     margin: 0.75rem 0 1rem;
+  }
+  .app-nav {
+    font-size: 0.85rem;
+    margin-bottom: 0.35rem;
+  }
+  .app-nav a {
+    color: #666;
   }
   .tagline {
     font-size: 0.85rem;

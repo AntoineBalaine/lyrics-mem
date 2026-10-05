@@ -2,6 +2,10 @@
 // Chord chart memorizer (proof of concept). Fully client-side: chord
 // charts live only in the browser's IndexedDB (see src/lib/chords-db.ts),
 // mirroring the lyrics app's public-mode pattern — no server-side DB.
+
+// Trimmed of its trailing slash so the links below can add their own,
+// which is the same convention src/pages/index.astro uses.
+const base = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
 ---
 
 <html lang="en">
@@ -12,6 +16,9 @@
   </head>
   <body>
     <header>
+      <nav class="app-nav">
+        <a href={`${base}/`}>lyrics-mem</a>
+      </nav>
       <h1>chords-mem</h1>
       <p class="tagline">
         A progressive-cloze chord chart memorizer. Paste an iRealPro chart link — charts live in
@@ -194,6 +201,13 @@
         border: 1px solid #ccc;
         border-radius: 4px;
         background: white;
+      }
+      .app-nav {
+        font-size: 0.85rem;
+        margin-bottom: 0.35rem;
+      }
+      .app-nav a {
+        color: #666;
       }
       .flag {
         display: inline-flex;

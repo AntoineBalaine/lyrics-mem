@@ -6,6 +6,9 @@ interface Props {
 const { songs, base } = Astro.props as Props;
 ---
 
+<nav class="app-nav">
+  <a href={`${base}/chords/`}>chords-mem</a>
+</nav>
 <h1>Songs</h1>
 <input id="q" type="search" placeholder="Search (fuzzy)…" autocomplete="off" />
 <ul id="list">
@@ -21,6 +24,13 @@ const { songs, base } = Astro.props as Props;
 </ul>
 
 <style>
+  .app-nav {
+    font-size: 0.85rem;
+    margin-bottom: 0.35rem;
+  }
+  .app-nav a {
+    color: #666;
+  }
   h1 {
     font-size: 1.4rem;
     font-weight: 600;
