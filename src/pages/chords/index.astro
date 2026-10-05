@@ -118,9 +118,9 @@ const base = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
       </div>
       <h2 id="chart-title"></h2>
       <nav class="level-nav">
-        <button id="btn-level-prev">← level</button>
+        <button id="btn-level-prev" class="level-fab level-fab-prev" aria-label="Previous level">‹</button>
         <span>Level <span id="chart-level-num">1</span> / <span id="chart-level-total">5</span></span>
-        <button id="btn-level-next">level →</button>
+        <button id="btn-level-next" class="level-fab level-fab-next" aria-label="Next level">›</button>
       </nav>
       <nav class="notation-nav" role="group" aria-label="Chord notation">
         <button type="button" data-notation="symbols" aria-pressed="true">Chord symbols</button>
@@ -370,15 +370,47 @@ const base = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
         color: #666;
         margin: 0 0 1.5rem;
       }
-      .level-nav button {
-        padding: 0.35rem 0.75rem;
-        border: 1px solid #ccc;
-        border-radius: 4px;
-        background: white;
+      /* The level buttons float over the sides of the screen, as the step
+         buttons of lyrics-mem do, so that they can be reached while the
+         chart fills the screen. Because they cover the chart's outer bars,
+         they are translucent, so that the chords under them can still be
+         read. */
+      .level-fab {
+        position: fixed;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 2.75rem;
+        height: 2.75rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+        border: none;
+        background: rgba(0, 0, 0, 0.12);
+        color: rgba(0, 0, 0, 0.65);
+        border-radius: 999px;
+        font-size: 1.75rem;
+        line-height: 1;
+        user-select: none;
+        z-index: 10;
+        cursor: pointer;
+        transition:
+          background 0.15s,
+          color 0.15s;
       }
-      .level-nav button:disabled {
-        opacity: 0.4;
+      .level-fab:hover:not(:disabled) {
+        background: rgba(0, 0, 0, 0.28);
+        color: rgba(0, 0, 0, 0.9);
+      }
+      .level-fab:disabled {
+        opacity: 0.35;
         cursor: default;
+      }
+      .level-fab-prev {
+        left: 0.75rem;
+      }
+      .level-fab-next {
+        right: 0.75rem;
       }
       .notation-nav {
         display: flex;
