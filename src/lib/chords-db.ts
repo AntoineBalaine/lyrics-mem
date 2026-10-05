@@ -44,7 +44,6 @@ interface ChordsDB extends DBSchema {
 }
 
 const DB_NAME = 'chords-mem';
-const DB_VERSION = 1;
 const STORE = 'charts';
 
 let dbPromise: Promise<IDBPDatabase<ChordsDB>> | null = null;
@@ -57,47 +56,60 @@ function createStore(connection: IDBPDatabase<ChordsDB>): void {
 
 /**
  * Opens the chart database, creating the store whatever state the origin
- * is already in.
+ * is already in, and naming no version while doing it.
  *
- * An upgrade callback runs only when the version rises, so opening at a
- * fixed version assumes this name is ours alone. It is not: a database of
- * this name can already exist on the origin, left by anything else ever
- * served from the same host and port, and then the store is simply absent
- * and every read fails with "not a known object store name". That is what
- * happened the first time a chart was saved. So the state is discovered
- * rather than assumed: open, and if the store is missing, reopen one
- * version higher to add it, which leaves whatever else the database holds
- * untouched.
+ * Two things rule out opening at a fixed version, and each one broke a
+ * browser in turn. An upgrade callback runs only when the version rises,
+ * so a database of this name that already exists on the origin, left by
+ * anything else ever served from the same host and port, simply has no
+ * store in it and every read fails with "not a known object store name".
+ * And asking for a version below the stored one does not merely skip the
+ * upgrade, it throws before any check can run, which is what a reload hit
+ * after the repair for the first problem had raised the version.
+ *
+ * Opening with no version avoids both: it takes the database at whatever
+ * version it has, or creates it, and only then is the store looked for. If
+ * it is missing the database is reopened one version higher to add it,
+ * which leaves whatever else it holds untouched.
  */
 async function openCharts(): Promise<IDBPDatabase<ChordsDB>> {
-  const onBlocking = (connection: IDBPDatabase<ChordsDB>) => () => {
-    // Another tab is upgrading. Letting go rather than holding it open is
-    // what keeps that tab from hanging.
-    connection.close();
+  const letGo = () => {
+    // Another tab is upgrading. Closing rather than holding on is what
+    // keeps that tab from hanging, and forgetting the connection means the
+    // next call opens a fresh one.
     dbPromise = null;
   };
 
-  let connection = await openDB<ChordsDB>(DB_NAME, DB_VERSION, {
-    upgrade: createStore,
+  const connection = await openDB<ChordsDB>(DB_NAME, undefined, {
     blocking() {
-      onBlocking(connection)();
+      connection.close();
+      letGo();
     },
   });
   if (connection.objectStoreNames.contains(STORE)) return connection;
 
   const next = connection.version + 1;
   connection.close();
-  connection = await openDB<ChordsDB>(DB_NAME, next, {
+  const upgraded = await openDB<ChordsDB>(DB_NAME, next, {
     upgrade: createStore,
     blocking() {
-      onBlocking(connection)();
+      upgraded.close();
+      letGo();
     },
   });
-  return connection;
+  return upgraded;
 }
 
 function db(): Promise<IDBPDatabase<ChordsDB>> {
-  if (!dbPromise) dbPromise = openCharts();
+  if (!dbPromise) {
+    // A failed open must not be remembered. Holding a rejected promise
+    // here would make one bad open permanent for the life of the page,
+    // with every later call failing for a reason that no longer applies.
+    dbPromise = openCharts().catch((error: unknown) => {
+      dbPromise = null;
+      throw error;
+    });
+  }
   return dbPromise;
 }
 
