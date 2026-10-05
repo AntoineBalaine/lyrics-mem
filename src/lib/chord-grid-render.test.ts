@@ -371,6 +371,11 @@ describe('renderGridHtml', () => {
       ]);
     });
 
+    it('colours a diminished triad and a diminished seventh as dominants', () => {
+      // From Doce de Coco, which passes from `B-` through `Bbo` to `A-`.
+      expect(family('Bbo |C#o7 ')).to.deep.equal(['quality-dominant', 'quality-dominant']);
+    });
+
     it('colours an altered chord as the dominant it is', () => {
       expect(family('C7alt ')).to.deep.equal(['quality-dominant']);
     });
@@ -417,10 +422,10 @@ describe('renderGridHtml', () => {
       expect(family('C6 |C^7 ')).to.deep.equal(['quality-major', 'quality-major']);
     });
 
-    it('leaves the two families that have had no ruling uncoloured', () => {
-      // A bare diminished triad and a diminished major seventh. A power
-      // chord too, which names neither a third nor a seventh.
-      expect(family('Co |Co^7 |C5 ')).to.deep.equal([]);
+    it('leaves the family that has had no ruling uncoloured', () => {
+      // A diminished major seventh. A power chord too, which names neither
+      // a third nor a seventh.
+      expect(family('Co^7 |C5 ')).to.deep.equal([]);
     });
 
     it('colours an alternative chord for what it is, not for its neighbour', () => {

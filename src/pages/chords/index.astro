@@ -438,9 +438,12 @@ const base = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
         padding: 0 var(--gutter);
         box-sizing: border-box;
       }
+      /* One pixel on the left, because without it the first barline of a
+         line touches the edge of the screen on a phone. */
       #chart-score {
         width: 100%;
         box-sizing: border-box;
+        padding-left: 1px;
       }
       #chart-score pre {
         font-family: ui-monospace, Menlo, Consolas, monospace;

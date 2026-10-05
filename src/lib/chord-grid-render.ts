@@ -173,7 +173,9 @@ function qualityGlyphs(chord: ParsedChord): string {
  * - `A7sus` is a dominant: the suspension replaces the third without
  *   changing the function, and the seventh is still there. A sus chord
  *   naming no seventh is read as a minor chord.
- * - A diminished seventh is a dominant.
+ * - A diminished chord is a dominant, a bare triad such as `Bbo` as well as
+ *   a diminished seventh, because a passing diminished chord, like the
+ *   `Bbo` between `B-` and `A-` in Doce de Coco, does a dominant's work.
  * - A minor major seventh, and its ninth, are minor chords.
  * - An added chord is a major chord, unless what it adds is a seventh.
  *   Its extension is the note being added rather than a stack reaching
@@ -183,8 +185,8 @@ function qualityGlyphs(chord: ParsedChord): string {
  * `Ch7` and `C-7b5`, which the parser reads as two different qualities,
  * come out the same colour as well as the same symbol.
  *
- * Two families are still deliberately uncoloured, having had no ruling: a
- * bare diminished triad, and the diminished major seventh.
+ * One family is still deliberately uncoloured, having had no ruling: the
+ * diminished major seventh.
  */
 function namesASeventh(extension: number | null): boolean {
   // A seventh, ninth, eleventh and thirteenth all stack on a seventh. A
@@ -206,9 +208,7 @@ function qualityClass(chord: ParsedChord): string | null {
     case ChordQuality.Suspended4:
       return seventh ? 'quality-dominant' : 'quality-minor';
     case ChordQuality.Diminished:
-      // Only a diminished seventh. A bare diminished triad has had no
-      // ruling and stays uncoloured.
-      return seventh ? 'quality-dominant' : null;
+      return 'quality-dominant';
     case ChordQuality.Add:
       // The extension names the note being added rather than a stack, so
       // `Cadd9` carries no seventh and is the major triad underneath it.
