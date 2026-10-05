@@ -393,22 +393,22 @@ const base = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
         font-family: ui-monospace, Menlo, Consolas, monospace;
         white-space: pre-wrap;
       }
-      /* One element per line of the chart, never wrapping: a line holds the
-         bars a reader expects it to hold, and a narrow screen scrolls
-         sideways instead of breaking the grouping. Aligned to the top
-         rather than the baseline, since a bar carrying an annotation is
-         taller than its neighbours and its chords must still line up with
-         theirs. */
+      /* A line is a grid rather than a row sized by its contents, which is
+         how iReal Pro always fits a screen exactly: a barline takes only
+         the width it needs and the bars share what is left in equal parts,
+         so the line is the container's width by construction. Sizing by
+         content is what pushed a line holding D7b9#5 past the edge of a
+         phone. The template reads as the leading barline, then a bar and
+         its closing barline repeated once per bar, which is why an ending
+         number sits inside its bar rather than between the two. */
       .chart-line {
-        display: flex;
-        flex-wrap: nowrap;
-        align-items: flex-start;
-        justify-content: space-between;
+        display: grid;
+        grid-template-columns: auto repeat(var(--bars, 4), minmax(0, 1fr) auto);
+        align-items: start;
+        column-gap: 0.15rem;
         width: 100%;
         margin-bottom: 0.6rem;
-      }
-      .chart-line > * {
-        flex-shrink: 0;
+        container-type: inline-size;
       }
       /* A section's letter and meter, on their own line above the chords. */
       .chart-heading {
@@ -420,12 +420,38 @@ const base = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
       /* A bar is a column: chords on the first row, whatever is written
          about the bar on a second row beneath them. */
       .bar-stack {
-        display: inline-flex;
+        display: flex;
         flex-direction: column;
-        align-items: flex-start;
+        align-items: stretch;
+        min-width: 0;
       }
       .bar-stack .under {
         line-height: 1.1;
+      }
+      /* The bar's own cells, so a chord sits where the chart put it: one
+         chord of a pair on the first cell of four starts at the bar's left
+         edge and holds half of it, and its partner on the third starts
+         halfway. */
+      .measure {
+        display: grid;
+        grid-template-columns: repeat(var(--cells, 1), 1fr);
+        align-items: baseline;
+        min-width: 0;
+      }
+      .measure > .cell {
+        grid-column: var(--cell-at, auto) / span var(--cell-span, 1);
+        min-width: 0;
+      }
+      /* Text shrinks to its cell rather than widening it, which is what
+         iReal Pro does with a crowded bar. Without this a long chord name
+         would force the cell wider and the grid would stop being equal
+         shares. */
+      .measure > .cell > .chord {
+        display: block;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: clip;
+        font-size: min(1.3rem, 7cqw);
       }
       #chart-score .navigation {
         font-size: 0.75rem;

@@ -486,6 +486,23 @@ function cellHtml(cell: LaidOutCell, opts: RenderOptions, hiding: BarHiding): st
 }
 
 /**
+ * How many cells a chord holds, which is until the next chord starts.
+ *
+ * A chord sounds from its own cell until something replaces it, so one on
+ * the first cell of four with nothing after it holds the whole bar, and
+ * one of a pair on cells one and three holds half. That is what lets a
+ * chord be drawn across the time it occupies rather than as a label with
+ * blank space beside it.
+ */
+function spanOf(cell: LaidOutCell, bar: LaidOutBar): number {
+  let next = bar.cellCount;
+  for (const other of bar.cells) {
+    if (other.slot > cell.slot && other.slot < next) next = other.slot;
+  }
+  return next - cell.slot;
+}
+
+/**
  * The chart as HTML for the page.
  *
  * One line of the chart is one element, which is what lets a narrow screen
@@ -522,11 +539,28 @@ export function renderGridHtml(layout: ChartLayout, opts: RenderOptions): string
     const parts: string[] = [];
     for (const bar of line.bars) {
       parts.push(`<span class="bar">${escapeHtml(BARLINE_TEXT[bar.openBarline])}</span>`);
-      if (bar.endingNumber !== undefined && endingStarts.has(bar.indexInChart)) {
-        parts.push(`<span class="ending">${bar.endingNumber}.</span>`);
-      }
+      // An ending's number goes inside the bar rather than beside it, so
+      // that a line is strictly a barline, a bar, a barline, a bar. The
+      // grid below sizes the bars from that alternation, and an extra
+      // child between them would take a bar's share of the width.
+      const ending =
+        bar.endingNumber !== undefined && endingStarts.has(bar.indexInChart)
+          ? `<span class="ending">${bar.endingNumber}.</span>`
+          : '';
       const hiding = barHiding(bar.indexInChart, opts.level);
-      const cells = bar.cells.map((cell) => cellHtml(cell, opts, hiding)).filter((html) => html !== '');
+
+      // Each chord is placed on the cell the chart wrote it on, so two
+      // chords in a bar land on the first and third beats rather than
+      // merely next to each other. iReal Pro writes a bar as a run of
+      // cells and pads the empty ones; the parser now keeps those
+      // positions instead of discarding the padding.
+      const cells: string[] = [];
+      for (const cell of bar.cells) {
+        const html = cellHtml(cell, opts, hiding);
+        if (html === '') continue;
+        const span = Math.max(1, Math.min(bar.cellCount - cell.slot, spanOf(cell, bar)));
+        cells.push(`<span class="cell" style="--cell-at:${cell.slot + 1};--cell-span:${span}">${html}</span>`);
+      }
 
       // The bar is a column: its chords on the first row, anything written
       // about the bar underneath them. An annotation beside the chords read
@@ -538,10 +572,14 @@ export function renderGridHtml(layout: ChartLayout, opts: RenderOptions): string
       }
       if (bar.fermata) below.push('<span class="fermata">⌢</span>');
       const under = below.length === 0 ? '' : `<span class="under">${below.join(' ')}</span>`;
-      parts.push(`<span class="bar-stack"><span class="measure">${cells.join(' ')}</span>${under}</span>`);
+      const measure = `<span class="measure" style="--cells:${bar.cellCount}">${cells.join('')}</span>`;
+      parts.push(`<span class="bar-stack">${ending}${measure}${under}</span>`);
     }
     parts.push(`<span class="bar">${escapeHtml(BARLINE_TEXT[line.closeBarline])}</span>`);
-    blocks.push(`<div class="chart-line">${parts.join('')}</div>`);
+    // The bar count drives the grid: a barline takes only the width it
+    // needs and the bars share everything left in equal parts, so the line
+    // is exactly the container's width whatever is written in it.
+    blocks.push(`<div class="chart-line" style="--bars:${line.bars.length}">${parts.join('')}</div>`);
   }
 
   const annotations = layout.annotations
