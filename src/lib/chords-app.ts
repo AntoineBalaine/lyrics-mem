@@ -8,6 +8,7 @@ import {
 } from './chords-db';
 import { applyFlagsFromUrl } from './feature-flags';
 import { CHORD_LEVELS, type ChordLevel } from './chord-cloze';
+import { fitChords, keepChordsFitted } from './chord-fit';
 import { renderGridHtml, renderGridText } from './chord-grid-render';
 import { NOTATION_MODES, type NotationMode } from './chord-numbers';
 import { DEMO_CHARTS } from './chords-demo-seed';
@@ -278,6 +279,10 @@ function renderAtCurrentLevel(): void {
   // time either was touched.
   const options = { mode: notation, key, level };
   $('chart-score').innerHTML = renderGridHtml(layout, options);
+  // Because new markup arrives with the renderer's estimate rather than a
+  // measured size, and the observer only reacts to a change of width, the
+  // chords are fitted here as well.
+  fitChords($('chart-score'));
   currentChartText = renderGridText(layout, options);
 
   const prevBtn = $<HTMLButtonElement>('btn-level-prev');
@@ -391,6 +396,9 @@ async function route(): Promise<void> {
 }
 
 function bind(): void {
+  // The chart's width changes with rotation and with the view being shown,
+  // so the fitting follows it rather than happening only at render time.
+  keepChordsFitted($('chart-score'));
   const search = $<HTMLInputElement>('library-search');
   const clearSearch = $<HTMLButtonElement>('btn-clear-search');
   // The button has nothing to clear while the field is empty, so it only

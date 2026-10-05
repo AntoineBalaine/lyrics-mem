@@ -582,6 +582,7 @@ export function renderGridHtml(layout: ChartLayout, opts: RenderOptions): string
     if (heading.length > 0) blocks.push(`<div class="chart-heading">${heading.join('')}</div>`);
 
     const parts: string[] = [];
+    let lineHasEnding = false;
     for (const bar of line.bars) {
       parts.push(`<span class="bar">${escapeHtml(BARLINE_TEXT[bar.openBarline])}</span>`);
       // An ending's number goes inside the bar rather than beside it, so
@@ -592,6 +593,7 @@ export function renderGridHtml(layout: ChartLayout, opts: RenderOptions): string
         bar.endingNumber !== undefined && endingStarts.has(bar.indexInChart)
           ? `<span class="ending">${bar.endingNumber}.</span>`
           : '';
+      if (ending !== '') lineHasEnding = true;
       const hiding = barHiding(bar.indexInChart, opts.level);
 
       // Each chord is placed on the cell the chart wrote it on, so two
@@ -599,14 +601,21 @@ export function renderGridHtml(layout: ChartLayout, opts: RenderOptions): string
       // merely next to each other. iReal Pro writes a bar as a run of
       // cells and pads the empty ones; the parser now keeps those
       // positions instead of discarding the padding.
+      // The size is the bar's rather than each chord's: the smallest that
+      // any chord in the bar needs, so that every chord of a bar is drawn at
+      // one size instead of shrinking as the room runs out.
+      let barFit = Infinity;
+      for (const cell of bar.cells) {
+        if (cellHtml(cell, opts, hiding) === '') continue;
+        barFit = Math.min(barFit, fitInViewportWidths(cell, bar, line.bars.length, opts));
+      }
       const cells: string[] = [];
       for (const cell of bar.cells) {
         const html = cellHtml(cell, opts, hiding);
         if (html === '') continue;
         const span = Math.max(1, Math.min(bar.cellCount - cell.slot, spanOf(cell, bar)));
-        const fit = fitInViewportWidths(cell, bar, line.bars.length, opts).toFixed(2);
         cells.push(
-          `<span class="cell" style="--cell-at:${cell.slot + 1};--cell-span:${span};--fit:${fit}vw">${html}</span>`,
+          `<span class="cell" style="--cell-at:${cell.slot + 1};--cell-span:${span};--fit:${barFit.toFixed(2)}vw">${html}</span>`,
         );
       }
 
@@ -627,7 +636,11 @@ export function renderGridHtml(layout: ChartLayout, opts: RenderOptions): string
     // The bar count drives the grid: a barline takes only the width it
     // needs and the bars share everything left in equal parts, so the line
     // is exactly the container's width whatever is written in it.
-    blocks.push(`<div class="chart-line" style="--bars:${line.bars.length}">${parts.join('')}</div>`);
+    // Because an ending's number stands above its bar without taking a row
+    // from it, a line holding one reserves a strip above all its bars, so
+    // that every bar's chords stay level with their neighbours.
+    const lineClass = lineHasEnding ? 'chart-line has-ending' : 'chart-line';
+    blocks.push(`<div class="${lineClass}" style="--bars:${line.bars.length}">${parts.join('')}</div>`);
   }
 
   const annotations = layout.annotations
