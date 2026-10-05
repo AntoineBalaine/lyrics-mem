@@ -425,8 +425,18 @@ const base = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
         align-items: stretch;
         min-width: 0;
       }
+      /* What is written under a bar must not widen it. The bar's share of
+         the line is already fixed, so the text wraps inside that share and
+         breaks mid-word if a single word is wider than the bar; without
+         this its unbroken width pushed past the bar's share, overflowed the
+         line and put a horizontal scrollbar on the chart. A longer note
+         makes its line taller, which costs nothing, rather than making the
+         chart wider, which breaks the fitting. */
       .bar-stack .under {
         line-height: 1.1;
+        min-width: 0;
+        white-space: normal;
+        overflow-wrap: anywhere;
       }
       /* The bar's own cells, so a chord sits where the chart put it: one
          chord of a pair on the first cell of four starts at the bar's left
@@ -442,16 +452,25 @@ const base = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
         grid-column: var(--cell-at, auto) / span var(--cell-span, 1);
         min-width: 0;
       }
-      /* Text shrinks to its cell rather than widening it, which is what
-         iReal Pro does with a crowded bar. Without this a long chord name
-         would force the cell wider and the grid would stop being equal
-         shares. */
+      /* Text shrinks to fit its cell rather than widening it, which is what
+         iReal Pro does with a crowded bar; a cell that grew would stop the
+         bars being equal shares. The size is taken from the cell rather
+         than from the line, so a chord sharing a bar with another shrinks
+         further than one holding the bar alone, which is the whole point.
+         CSS cannot measure text, so this is proportional rather than exact:
+         the factor is set so that the longest chord names in a real
+         library, seven or eight characters, fit a quarter-line bar on a
+         narrow phone. */
       .measure > .cell > .chord {
         display: block;
         white-space: nowrap;
-        overflow: hidden;
-        text-overflow: clip;
-        font-size: min(1.3rem, 7cqw);
+        /* The renderer works out the largest size at which this cell's text
+           fits the width the grid gives it, from the text's own length and
+           the cell's share of the line, and passes it as --fit. Sizing from
+           the line alone could not work: a fixed share of a line is wider
+           than the maximum on any ordinary screen, so the smaller of the two
+           was always the maximum and nothing ever shrank. */
+        font-size: clamp(0.62rem, var(--fit, 1.3rem), 1.3rem);
       }
       #chart-score .navigation {
         font-size: 0.75rem;
@@ -465,10 +484,14 @@ const base = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
         color: #666;
         font-size: 0.85rem;
       }
+      /* A repeat's number stands on its own row above the bar, so it takes
+         no width from the chords and cannot push them about. A fixed size
+         keeps it out of the shrinking that applies to a chord. */
       #chart-score .ending {
         color: #666;
         font-size: 0.8rem;
-        margin-right: 0.2rem;
+        line-height: 1.1;
+        white-space: nowrap;
       }
       #chart-score .annotation {
         color: #666;

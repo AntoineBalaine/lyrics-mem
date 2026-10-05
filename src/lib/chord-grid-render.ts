@@ -486,6 +486,47 @@ function cellHtml(cell: LaidOutCell, opts: RenderOptions, hiding: BarHiding): st
 }
 
 /**
+ * Roughly how many full-size characters wide a cell's text is.
+ *
+ * The quality sits in a superscript at about two thirds of the size, so it
+ * counts for less than the root does. This is an estimate, because CSS
+ * cannot measure text and the alternative is measuring in the browser with
+ * script; it only has to be close enough to choose a size that fits.
+ */
+function textWidthInCharacters(cell: LaidOutCell, opts: RenderOptions): number {
+  const SUPERSCRIPT = 0.65;
+  if (!cell.chord) return Math.max(1, cellWithoutChordText(cell, opts, true).length);
+  const parts = chordParts(cell.chord, opts, true);
+  let width = parts.root.length + parts.quality.length * SUPERSCRIPT + parts.bass.length;
+  if (cell.alternative) {
+    const alt = chordParts(cell.alternative, opts, true);
+    width += 2 + alt.root.length + alt.quality.length * SUPERSCRIPT + alt.bass.length;
+  }
+  return Math.max(1, width);
+}
+
+/**
+ * The largest font size at which a cell's text fits the width it is given,
+ * as a share of the line's width.
+ *
+ * The cell's share of the line is its span of its bar, times the bar's
+ * share of the line. Dividing that by how wide the text is in characters
+ * gives the size each character may be, and `GLYPH` is how wide a
+ * character is as a fraction of the font size for this typeface.
+ *
+ * This replaces a size taken from the line alone, which was useless: seven
+ * per cent of a line is wider than the maximum size on any ordinary
+ * screen, so the smaller of the two was always the maximum and nothing
+ * ever shrank.
+ */
+function fitInLineWidths(cell: LaidOutCell, bar: LaidOutBar, barsInLine: number, opts: RenderOptions): number {
+  const GLYPH = 0.62;
+  const span = Math.max(1, Math.min(bar.cellCount - cell.slot, spanOf(cell, bar)));
+  const shareOfLine = (100 * span) / (bar.cellCount * Math.max(1, barsInLine));
+  return shareOfLine / (GLYPH * textWidthInCharacters(cell, opts));
+}
+
+/**
  * How many cells a chord holds, which is until the next chord starts.
  *
  * A chord sounds from its own cell until something replaces it, so one on
@@ -559,7 +600,10 @@ export function renderGridHtml(layout: ChartLayout, opts: RenderOptions): string
         const html = cellHtml(cell, opts, hiding);
         if (html === '') continue;
         const span = Math.max(1, Math.min(bar.cellCount - cell.slot, spanOf(cell, bar)));
-        cells.push(`<span class="cell" style="--cell-at:${cell.slot + 1};--cell-span:${span}">${html}</span>`);
+        const fit = fitInLineWidths(cell, bar, line.bars.length, opts).toFixed(2);
+        cells.push(
+          `<span class="cell" style="--cell-at:${cell.slot + 1};--cell-span:${span};--fit:${fit}cqw">${html}</span>`,
+        );
       }
 
       // The bar is a column: its chords on the first row, anything written
