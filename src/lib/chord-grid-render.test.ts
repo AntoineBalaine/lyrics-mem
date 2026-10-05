@@ -371,6 +371,10 @@ describe('renderGridHtml', () => {
       ]);
     });
 
+    it('colours an altered chord as the dominant it is', () => {
+      expect(family('C7alt ')).to.deep.equal(['quality-dominant']);
+    });
+
     it('leaves a quality it was not asked about uncoloured', () => {
       expect(family('C+ |Co7 |C7sus |C5 ')).to.deep.equal([]);
     });

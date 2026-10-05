@@ -158,23 +158,27 @@ function qualityGlyphs(chord: ParsedChord): string {
  * The colour family a chord belongs to, as a class name, or null for one
  * that gets no colour of its own.
  *
- * Only the four families named by the request are coloured, so an
- * augmented, suspended, power or added chord stays in the body text's own
+ * Four colours, for the families the request named. An augmented,
+ * diminished, suspended, power or added chord stays in the body text's own
  * colour rather than being given a meaning by implication.
  *
- * Two readings need care. A bare `C` parses as a dominant with no
+ * Three readings need care. A bare `C` parses as a dominant with no
  * extension, because the dialect writes a dominant as the absence of a
  * quality symbol, and musically it is a major triad, so it is coloured as
- * one: red is for a dominant that actually names a seventh or above. And
- * the half-diminished test is the same predicate the glyph uses, so that
- * `Ch7` and `C-7b5`, which the parser reads as two different qualities,
- * come out the same colour as well as the same symbol.
+ * one: red is for a dominant that actually names a seventh or above. An
+ * altered chord, `C7alt`, is a dominant with its tensions left unsaid, so
+ * it takes the dominant's colour too. And the half-diminished test is the
+ * same predicate the glyph uses, so that `Ch7` and `C-7b5`, which the
+ * parser reads as two different qualities, come out the same colour as
+ * well as the same symbol.
  */
 function qualityClass(chord: ParsedChord): string | null {
   if (isHalfDiminished(chord)) return 'quality-half-diminished';
   switch (chord.quality) {
     case ChordQuality.Dominant:
       return chord.extension === null ? 'quality-major' : 'quality-dominant';
+    case ChordQuality.Altered:
+      return 'quality-dominant';
     case ChordQuality.Minor:
       return 'quality-minor';
     case ChordQuality.Major:
